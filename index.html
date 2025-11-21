@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TCM Point Function Finder</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f5f7f4;
+      color: #333;
+    }
+
+    .page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      max-width: 1100px;
+      width: 100%;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.08);
+      padding: 24px 28px 28px;
+    }
+
+    h1 {
+      margin-top: 0;
+      text-align: center;
+      font-size: 1.8rem;
+      color: #1e293b;
+    }
+
+    .subtitle {
+      text-align: center;
+      margin-bottom: 24px;
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+
+    .layout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .panel {
+      flex: 1 1 320px;
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 16px 18px 18px;
+      border: 1px solid #e5e7eb;
+    }
+
+    .panel h2 {
+      margin-top: 0;
+      font-size: 1.1rem;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel h2 span.icon {
+      display: inline-flex;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      align-items: center;
+      justify-content: center;
+      background: #bbf7d0;
+      color: #166534;
+      font-size: 0.9rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #4b5563;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      background: #ffffff;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: #22c55e;
+      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #22c55e;
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s ease, transform 0.05s ease;
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    button:hover {
+      background: #16a34a;
+    }
+
+    button.secondary:hover {
+      background: #d1d5db;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    .helper-text {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    .results {
+      margin-top: 12px;
+      max-height: 360px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .result-empty {
+      font-size: 0.9rem;
+      color: #9ca3af;
+      font-style: italic;
+      padding: 6px 0;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.75rem;
+      background: #dcfce7;
+      color: #166534;
+      border-radius: 999px;
+      padding: 3px 8px;
+      margin-bottom: 4px;
+    }
+
+    .point-card {
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+      background: #ffffff;
+    }
+
+    .point-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .point-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #111827;
+    }
+
+    .point-channel {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    .function-list {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 0.85rem;
+      color: #374151;
+    }
+
+    .function-list li {
+      margin-bottom: 2px;
+    }
+
+    .highlight {
+      background: #fef9c3;
+    }
+
+    .badge-count {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    @media (max-width: 720px) {
+      .card {
+        padding: 18px 16px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <h1>TCM Point Function Finder</h1>
+      <div class="subtitle">
+        Type a function (e.g. <em>cough</em>, <em>clears heat</em>) or choose a specific point to see its functions.
+      </div>
+
+      <div class="layout">
+        <!-- Search by Function -->
+        <section class="panel" aria-label="Search by function">
+          <h2><span class="icon">①</span> Search by Function</h2>
+          <label for="functionInput">Function keyword</label>
+          <input
+            type="text"
+            id="functionInput"
+            placeholder="e.g. cough, clears heat, wheezing, insomnia"
+          />
+          <div class="controls">
+            <button id="functionSearchBtn" type="button">
+              🔍 Search
+            </button>
+            <button id="functionClearBtn" type="button" class="secondary">
+              ✖ Clear
+            </button>
+          </div>
+          <div class="helper-text">
+            Searches within all function/indication text (case-insensitive, partial matches ok).
+          </div>
+          <div id="functionResults" class="results"></div>
+        </section>
+
+        <!-- Search by Point -->
+        <section class="panel" aria-label="Search by point">
+          <h2><span class="icon">②</span> Search by Point</h2>
+          <label for="pointSelect">Select a point</label>
+          <select id="pointSelect">
+            <option value="">— Choose a point —</option>
+          </select>
+          <div class="controls" style="margin-top: 10px; margin-bottom: 4px;">
+            <button id="pointShowBtn" type="button">
+              📍 Show Functions
+            </button>
+          </div>
+          <div class="helper-text">
+            You can quickly see all functions for one point (LU, LI, ST, etc.).
+          </div>
+          <div id="pointResults" class="results"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -----------------------------------------
+    // DATA MODEL
+    // -----------------------------------------
+    // This is a SAMPLE dataset to demonstrate functionality.
+    // You can expand this with the rest of your points/functions.
+    // Structure:
+    // {
+    //   code: 'LU-2',
+    //   name: 'Yunmen (Cloud Gate)',
+    //   channel: 'Lung',
+    //   functions: [ 'Clears Lung heat', 'Disseminates Lung qi', ... ]
+    // }
+
+    const pointsData = [
+      {
+        code: "LU-2",
+        name: "Yunmen (Cloud Gate)",
+        channel: "Lung",
+        functions: [
+          "Clears Lung heat",
+          "Disseminates Lung qi",
+          "Descends Lung qi",
+          "Dispels agitation and fullness in the chest",
+          "Relieves cough, wheezing, asthma",
+          "Dyspnoea with inability to lie down",
+          "Oppressive or painful sensation in the chest",
+          "Pain of the shoulders and supraclavicular fossa",
+          "Throat painful obstruction",
+          "Goitre"
+        ]
+      },
+      {
+        code: "LU-3",
+        name: "Tianfu (Palace of Heaven)",
+        channel: "Lung",
+        functions: [
+          "Clears Lung heat",
+          "Descends Lung qi",
+          "Cools blood and stops bleeding",
+          "Calms the corporeal soul (po)",
+          "Cough, wheezing, dyspnoea",
+          "Nosebleed, spitting or coughing blood",
+          "Somnolence or insomnia",
+          "Sadness, weeping, disorientation, forgetfulness",
+          "Goitre, swelling of the throat",
+          "Pain of the antero-lateral aspect of the upper arm",
+          "Dizziness and visual dizziness"
+        ]
+      },
+      {
+        code: "LU-5",
+        name: "Chize (Cubit Marsh)",
+        channel: "Lung",
+        functions: [
+          "Clears heat from the Lung",
+          "Descends rebellious qi",
+          "Regulates the water passages",
+          "Activates the channel and relaxes the sinews",
+          "Alleviates pain",
+          "Cough, coughing phlegm, wheezing, asthma, dyspnoea",
+          "Fullness or agitation of the chest",
+          "Tidal or taxation fever, malaria",
+          "Dry mouth, dry tongue, throat painful obstruction",
+          "Spitting, coughing or vomiting blood",
+          "Diarrhoea and abdominal distention",
+          "Swelling of the four limbs, enuresis, frequent urination",
+          "Shoulder and elbow pain, inability to raise the arm",
+          "Lumbar pain, knee swelling and pain"
+        ]
+      },
+      {
+        code: "LU-7",
+        name: "Lieque (Broken Sequence)",
+        channel: "Lung",
+        functions: [
+          "Releases the exterior and expels wind",
+          "Promotes the descending function of the Lung",
+          "Pacifies wind and phlegm",
+          "Benefits the head and nape",
+          "Opens and regulates the Conception vessel",
+          "Regulates the water passages",
+          "Activates the channel and alleviates pain",
+          "Chills and fever, exterior wind-cold",
+          "Nasal congestion, discharge, polyps, flaring nostrils",
+          "Throat painful obstruction",
+          "Cough, phlegm, wheezing, dyspnoea, asthma, diminished qi",
+          "Headache, stiffness of neck and nape, lockjaw",
+          "Hemiplegia, deviation of the mouth and eye",
+          "Hypertension",
+          "Urinary and genital disorders such as hot or painful urination"
+        ]
+      },
+      {
+        code: "LU-9",
+        name: "Taiyuan (Supreme Abyss)",
+        channel: "Lung",
+        functions: [
+          "Tonifies the Lung",
+          "Transforms phlegm",
+          "Promotes the descending function of the Lung",
+          "Regulates and harmonises the one hundred vessels",
+          "Cough with watery phlegm, asthma, wheezing, dyspnoea",
+          "Oppression and agitation of the chest with difficult breathing",
+          "Spitting, coughing or vomiting blood",
+          "Rebellion of Stomach qi, belching",
+          "Head wind, swelling of the face",
+          "Pain and weakness of the wrist, shoulder, back and inner arm"
+        ]
+      },
+      {
+        code: "LU-11",
+        name: "Shaoshang (Lesser Shang)",
+        channel: "Lung",
+        functions: [
+          "Revives consciousness",
+          "Clears heat and benefits the throat",
+          "Loss of consciousness from windstroke",
+          "Cold or hot inversion",
+          "Severe sore throat, throat painful obstruction",
+          "Nosebleed, dry lips with desire to drink",
+          "Febrile disease with cold shivering",
+          "Agitation of the Heart with cough or dyspnoea",
+          "Mania and childhood fright wind",
+          "Pain or contraction of the thumb and wrist"
+        ]
+      },
+      {
+        code: "LI-4",
+        name: "Hegu (Joining Valley)",
+        channel: "Large Intestine",
+        functions: [
+          "Regulates the defensive qi and adjusts sweating",
+          "Expels wind and releases the exterior",
+          "Regulates the face, eyes, nose, mouth and ears",
+          "Activates the channel and alleviates pain",
+          "Induces labour",
+          "Restores the yang",
+          "Chills and fever, exterior wind-cold pattern",
+          "Headache (one-sided or whole head), hypertension",
+          "Eye disorders, nosebleed, rhinitis, sneezing",
+          "Toothache, mouth ulcers, tongue rigidity, mumps, loss of voice",
+          "Facial swelling, deviation of the mouth, lockjaw",
+          "Dysenteric disorder, childhood nutritional impairment",
+          "Wind rash, malaria, mania",
+          "Painful obstruction or atrophy of the four limbs, hemiplegia",
+          "Pain of the arm, bones, sinews and lumbar spine"
+        ]
+      },
+      {
+        code: "ST-25",
+        name: "Tianshu (Heaven’s Pivot)",
+        channel: "Stomach",
+        functions: [
+          "Regulates the intestines, Spleen and Stomach",
+          "Resolves dampness and damp-heat",
+          "Regulates qi and blood and eliminates stagnation",
+          "Diarrhoea, dysenteric disorder, borborygmus",
+          "Constipation, drum distention, abdominal swelling",
+          "Turbid painful urinary dysfunction, oedema",
+          "Vomiting, retching, difficult ingestion, poor appetite",
+          "Sudden turmoil disorder with abdominal pain",
+          "Intestinal abscess",
+          "Abdominal masses, uterine pain, dysmenorrhoea, irregular menstruation, infertility",
+          "Red or white leucorrhoea",
+          "Cold shivering from malaria, severe heat with manic raving"
+        ]
+      }
+      // 👉 Add more points here using the same structure.
+    ];
+
+    // -----------------------------------------
+    // HELPER: Build a map from code -> point object
+    // -----------------------------------------
+    const pointMap = {};
+    pointsData.forEach((pt) => {
+      pointMap[pt.code] = pt;
+    });
+
+    // -----------------------------------------
+    // DOM ELEMENTS
+    // -----------------------------------------
+    const functionInput = document.getElementById("functionInput");
+    const functionResults = document.getElementById("functionResults");
+    const functionSearchBtn = document.getElementById("functionSearchBtn");
+    const functionClearBtn = document.getElementById("functionClearBtn");
+
+    const pointSelect = document.getElementById("pointSelect");
+    const pointShowBtn = document.getElementById("pointShowBtn");
+    const pointResults = document.getElementById("pointResults");
+
+    // -----------------------------------------
+    // INITIALISE POINT DROPDOWN
+    // -----------------------------------------
+    function populatePointSelect() {
+      const sorted = [...pointsData].sort((a, b) =>
+        a.code.localeCompare(b.code, "en", { numeric: true })
+      );
+      for (const pt of sorted) {
+        const option = document.createElement("option");
+        option.value = pt.code;
+        option.textContent = `${pt.code} — ${pt.name}`;
+        pointSelect.appendChild(option);
+      }
+    }
+
+    populatePointSelect();
+
+    // -----------------------------------------
+    // SEARCH BY FUNCTION
+    // -----------------------------------------
+    function highlightMatch(text, query) {
+      if (!query) return text;
+      const regex = new RegExp("(" + query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+      return text.replace(regex, "<span class='highlight'>$1</span>");
+    }
+
+    function searchByFunction() {
+      const raw = functionInput.value.trim();
+      functionResults.innerHTML = "";
+      const q = raw.toLowerCase();
+
+      if (!q) {
+        functionResults.innerHTML =
+          "<div class='result-empty'>Type a keyword like <em>cough</em>, <em>insomnia</em>, <em>clears heat</em>, etc.</div>";
+        return;
+      }
+
+      const matches = [];
+
+      for (const pt of pointsData) {
+        const matchedFunctions = pt.functions.filter((fn) =>
+          fn.toLowerCase().includes(q)
+        );
+        if (matchedFunctions.length) {
+          matches.push({ point: pt, functions: matchedFunctions });
+        }
+      }
+
+      if (!matches.length) {
+        functionResults.innerHTML =
+          "<div class='result-empty'>No points found with that function text. Try another keyword or shorter phrase.</div>";
+        return;
+      }
+
+      for (const entry of matches) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "point-card";
+
+        const header = document.createElement("div");
+        header.className = "point-header";
+
+        const left = document.createElement("div");
+        const nameEl = document.createElement("div");
+        nameEl.className = "point-name";
+        nameEl.textContent = `${entry.point.code} — ${entry.point.name}`;
+
+        const channelEl = document.createElement("div");
+        channelEl.className = "point-channel";
+        channelEl.textContent = entry.point.channel + " channel";
+
+        left.appendChild(nameEl);
+        left.appendChild(channelEl);
+
+        const right = document.createElement("div");
+        right.className = "badge-count";
+        right.textContent = `${entry.functions.length} matching function(s)`;
+
+        header.appendChild(left);
+        header.appendChild(right);
+        wrapper.appendChild(header);
+
+        const ul = document.createElement("ul");
+        ul.className = "function-list";
+
+        entry.functions.forEach((fn) => {
+          const li = document.createElement("li");
+          li.innerHTML = highlightMatch(fn, raw);
+          ul.appendChild(li);
+        });
+
+        wrapper.appendChild(ul);
+        functionResults.appendChild(wrapper);
+      }
+    }
+
+    function clearFunctionSearch() {
+      functionInput.value = "";
+      functionResults.innerHTML =
+        "<div class='result-empty'>Cleared. Enter a function keyword to search again.</div>";
+      functionInput.focus();
+    }
+
+    functionSearchBtn.addEventListener("click", searchByFunction);
+    functionClearBtn.addEventListener("click", clearFunctionSearch);
+
+    functionInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        searchByFunction();
+      }
+    });
+
+    // -----------------------------------------
+    // SEARCH BY POINT
+    // -----------------------------------------
+    function showPointFunctions() {
+      const code = pointSelect.value;
+      pointResults.innerHTML = "";
+
+      if (!code) {
+        pointResults.innerHTML =
+          "<div class='result-empty'>Choose a point above to see its functions.</div>";
+        return;
+      }
+
+      const pt = pointMap[code];
+      if (!pt) {
+        pointResults.innerHTML =
+          "<div class='result-empty'>Point not found in the dataset.</div>";
+        return;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "point-card";
+
+      const header = document.createElement("div");
+      header.className = "point-header";
+
+      const left = document.createElement("div");
+      const nameEl = document.createElement("div");
+      nameEl.className = "point-name";
+      nameEl.textContent = `${pt.code} — ${pt.name}`;
+
+      const channelEl = document.createElement("div");
+      channelEl.className = "point-channel";
+      channelEl.textContent = pt.channel + " channel";
+
+      left.appendChild(nameEl);
+      left.appendChild(channelEl);
+
+      const right = document.createElement("div");
+      right.innerHTML = `<span class="pill">${pt.functions.length} function(s)</span>`;
+
+      header.appendChild(left);
+      header.appendChild(right);
+      wrapper.appendChild(header);
+
+      const ul = document.createElement("ul");
+      ul.className = "function-list";
+
+      pt.functions.forEach((fn) => {
+        const li = document.createElement("li");
+        li.textContent = fn;
+        ul.appendChild(li);
+      });
+
+      wrapper.appendChild(ul);
+      pointResults.appendChild(wrapper);
+    }
+
+    pointShowBtn.addEventListener("click", showPointFunctions);
+    pointSelect.addEventListener("change", showPointFunctions);
+
+    // Initialise empty-result text
+    functionResults.innerHTML =
+      "<div class='result-empty'>Type a keyword to search for functions across all points.</div>";
+    pointResults.innerHTML =
+      "<div class='result-empty'>Choose a point to view its full function list.</div>";
+  </script>
+</body>
+</html>
