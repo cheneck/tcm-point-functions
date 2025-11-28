@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>TCM Point Function Finder</title>
+  <title>Ortho-Neuro TCM Point Function Finder</title>
   <style>
     * {
       box-sizing: border-box;
@@ -25,7 +26,7 @@
     }
 
     .card {
-      max-width: 1100px;
+      max-width: 1250px;
       width: 100%;
       background: #ffffff;
       border-radius: 16px;
@@ -59,6 +60,7 @@
       border-radius: 12px;
       padding: 16px 18px 18px;
       border: 1px solid #e5e7eb;
+      min-width: 0;
     }
 
     .panel h2 {
@@ -176,7 +178,18 @@
       color: #166534;
       border-radius: 999px;
       padding: 3px 8px;
-      margin-bottom: 4px;
+      margin-right: 4px;
+      margin-top: 2px;
+    }
+
+    .pill.category {
+      background: #e0f2fe;
+      color: #1d4ed8;
+    }
+
+    .pill.category.selected {
+      background: #bfdbfe;
+      font-weight: 600;
     }
 
     .point-card {
@@ -214,7 +227,18 @@
     }
 
     .function-list li {
-      margin-bottom: 2px;
+      margin-bottom: 4px;
+    }
+
+    .fn-line {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .fn-text {
+      margin-right: 4px;
     }
 
     .highlight {
@@ -226,7 +250,7 @@
       color: #6b7280;
     }
 
-    @media (max-width: 720px) {
+    @media (max-width: 960px) {
       .card {
         padding: 18px 16px 20px;
       }
@@ -236,36 +260,33 @@
 <body>
   <div class="page">
     <div class="card">
-      <h1>TCM Point Function Finder</h1>
+      <h1>Ortho-Neuro TCM Point Function Finder</h1>
       <div class="subtitle">
-        Type a function (e.g. <em>cough</em>, <em>clears heat</em>) or choose a specific point to see its functions.
+        Single-page app built from your 1410-row CSV.<br/>
+        Search by <strong>function</strong>, <strong>point</strong>, or <strong>category</strong>.
       </div>
 
       <div class="layout">
-        <!-- Search by Function -->
+        <!-- ① Search by Function -->
         <section class="panel" aria-label="Search by function">
           <h2><span class="icon">①</span> Search by Function</h2>
           <label for="functionInput">Function keyword</label>
           <input
             type="text"
             id="functionInput"
-            placeholder="e.g. cough, clears heat, wheezing, insomnia"
+            placeholder="e.g. stiff neck, pain of the knee, atrophy disorder"
           />
           <div class="controls">
-            <button id="functionSearchBtn" type="button">
-              🔍 Search
-            </button>
-            <button id="functionClearBtn" type="button" class="secondary">
-              ✖ Clear
-            </button>
+            <button id="functionSearchBtn" type="button">🔍 Search</button>
+            <button id="functionClearBtn" type="button" class="secondary">✖ Clear</button>
           </div>
           <div class="helper-text">
-            Searches within all function/indication text (case-insensitive, partial matches ok).
+            Searches within <code>functionText</code> (case-insensitive, partial matches).
           </div>
           <div id="functionResults" class="results"></div>
         </section>
 
-        <!-- Search by Point -->
+        <!-- ② Search by Point -->
         <section class="panel" aria-label="Search by point">
           <h2><span class="icon">②</span> Search by Point</h2>
           <label for="pointSelect">Select a point</label>
@@ -273,265 +294,1476 @@
             <option value="">— Choose a point —</option>
           </select>
           <div class="controls" style="margin-top: 10px; margin-bottom: 4px;">
-            <button id="pointShowBtn" type="button">
-              📍 Show Functions
-            </button>
+            <button id="pointShowBtn" type="button">📍 Show Functions</button>
           </div>
           <div class="helper-text">
-            You can quickly see all functions for one point (LU, LI, ST, etc.).
+            Shows all rows for that <code>point</code> (all functions + categories).
           </div>
           <div id="pointResults" class="results"></div>
+        </section>
+
+        <!-- ③ Search by Category -->
+        <section class="panel" aria-label="Search by category">
+          <h2><span class="icon">③</span> Search by Category</h2>
+          <label for="categorySelect">Category (Body Area)</label>
+          <select id="categorySelect">
+            <option value="">— Choose a category —</option>
+          </select>
+          <div class="controls" style="margin-top: 10px; margin-bottom: 4px;">
+            <button id="categorySearchBtn" type="button">🦴 Search by Category</button>
+            <button id="categoryClearBtn" type="button" class="secondary">✖ Clear</button>
+          </div>
+          <div class="helper-text">
+            Uses your <code>Category</code> labels (Neck, Shoulder, Back, Knee, Foot, Toes, etc.).
+          </div>
+          <div id="categoryResults" class="results"></div>
         </section>
       </div>
     </div>
   </div>
 
   <script>
-    // -----------------------------------------
-    // DATA MODEL
-    // -----------------------------------------
-    // This is a SAMPLE dataset to demonstrate functionality.
-    // You can expand this with the rest of your points/functions.
-    // Structure:
-    // {
-    //   code: 'LU-2',
-    //   name: 'Yunmen (Cloud Gate)',
-    //   channel: 'Lung',
-    //   functions: [ 'Clears Lung heat', 'Disseminates Lung qi', ... ]
-    // }
+const rows = [
+  { point: "LU-2", pinyin: "", functionText: "Sudden pain of the abdomen (AMA 78)", category: "Generalized" },
+  { point: "LU-2", pinyin: "", functionText: "Pain of the lateral costal region (AMA 78)", category: "Generalized" },
+  { point: "LU-2", pinyin: "", functionText: "Pain of the back (AMA 78)", category: "Back" },
+  { point: "LU-2", pinyin: "", functionText: "Pain of the shoulders (AMA 78)", category: "Shoulder" },
+  { point: "LU-2", pinyin: "", functionText: "Pain of the shoulder with inability to raise the arm (AMA 78)", category: "Shoulder" },
+  { point: "LU-2", pinyin: "", functionText: "Pain of the supraclavicular fossa (AMA 78)", category: "Shoulder" },
+  { point: "LU-3", pinyin: "", functionText: "Pain of the inner (antero-lateral) aspect of the upper arm (AMA 79)", category: "Generalized" },
+  { point: "LU-4", pinyin: "", functionText: "Pain in the medial aspect of the arm (AMA 80)", category: "Generalized" },
+  { point: "LU-5", pinyin: "", functionText: "Relaxes the sinews (AMA 80)", category: "Generalized" },
+  { point: "LU-5", pinyin: "", functionText: "Pain of the upper arm (AMA 80)", category: "Generalized" },
+  { point: "LU-5", pinyin: "", functionText: "Pain of the shoulder (AMA 80)", category: "Shoulder" },
+  { point: "LU-5", pinyin: "", functionText: "Inability to raise the arm to the head (AMA 80)", category: "Shoulder" },
+  { point: "LU-5", pinyin: "", functionText: "Wandering painful obstruction of the elbow (AMA 80)", category: "Elbow" },
+  { point: "LU-5", pinyin: "", functionText: "Wandering painful obstruction of the upper arm (AMA 80)", category: "Generalized" },
+  { point: "LU-5", pinyin: "", functionText: "Restricted movement of the elbow (AMA 80)", category: "Elbow" },
+  { point: "LU-5", pinyin: "", functionText: "Elbow pain (AMA 80)", category: "Elbow" },
+  { point: "LU-5", pinyin: "", functionText: "Difficulty in opening the hand (AMA 80)", category: "Hand" },
+  { point: "LU-5", pinyin: "", functionText: "Difficulty in extending the hand (AMA 80)", category: "Hand" },
+  { point: "LU-5", pinyin: "", functionText: "The five types of lumbar pain (AMA 80)", category: "Back" },
+  { point: "LU-5", pinyin: "", functionText: "Crane's knee swelling (AMA 80)", category: "Knee" },
+  { point: "LU-5", pinyin: "", functionText: "Crane's knee pain (AMA 80)", category: "Knee" },
+  { point: "LU-6", pinyin: "", functionText: "Severe pain of the elbow (AMA 83)", category: "Elbow" },
+  { point: "LU-6", pinyin: "", functionText: "Severe pain of the upper arm (AMA 83)", category: "Generalized" },
+  { point: "LU-6", pinyin: "", functionText: "Inability to raise the arm above the head (AMA 83)", category: "Generalized" },
+  { point: "LU-6", pinyin: "", functionText: "Difficulty in flexing the fingers (AMA 83)", category: "Finger" },
+  { point: "LU-6", pinyin: "", functionText: "Difficulty in extending the fingers (AMA 83)", category: "Finger" },
+  { point: "LU-7", pinyin: "", functionText: "Weakness of the wrist (AMA 84)", category: "Wrist" },
+  { point: "LU-7", pinyin: "", functionText: "Weakness of the hand (AMA 84)", category: "Hand" },
+  { point: "LU-7", pinyin: "", functionText: "Pain of the wrist (AMA 84)", category: "Wrist" },
+  { point: "LU-7", pinyin: "", functionText: "Pain of the hand (AMA 84)", category: "Hand" },
+  { point: "LU-7", pinyin: "", functionText: "Pain of the thumb (AMA 84)", category: "Finger" },
+  { point: "LU-7", pinyin: "", functionText: "Shoulder pain (AMA 84)", category: "Shoulder" },
+  { point: "LU-8", pinyin: "", functionText: "Pain of the upper back (AMA 86)", category: "Back" },
+  { point: "LU-8", pinyin: "", functionText: "Wrist pain (AMA 86)", category: "Wrist" },
+  { point: "LU-8", pinyin: "", functionText: "Pain in the soles of the feet (AMA 86)", category: "Foot" },
+  { point: "LU-9", pinyin: "", functionText: "Weakness of the wrist (AMA 87)", category: "Wrist" },
+  { point: "LU-9", pinyin: "", functionText: "Pain of the wrist (AMA 87)", category: "Wrist" },
+  { point: "LU-9", pinyin: "", functionText: "Pain of the shoulder (AMA 87)", category: "Shoulder" },
+  { point: "LU-9", pinyin: "", functionText: "Pain of the back (AMA 87)", category: "Back" },
+  { point: "LU-9", pinyin: "", functionText: "Pain of the supraclavicular fossa (AMA 87)", category: "Shoulder" },
+  { point: "LU-9", pinyin: "", functionText: "Pain in the inner aspect of the arm (AMA 87)", category: "Generalized" },
+  { point: "LU-10", pinyin: "", functionText: "Pain of the palm (AMA 88)", category: "Hand" },
+  { point: "LU-10", pinyin: "", functionText: "Pain of the thumb (AMA 88)", category: "Finger" },
+  { point: "LU-10", pinyin: "", functionText: "Contraction of the elbow with distention (AMA 88)", category: "Elbow" },
+  { point: "LI-1", pinyin: "", functionText: "Pain of the shoulder that radiates to the supraclavicular fossa (AMA 100)", category: "Shoulder" },
+  { point: "LI-1", pinyin: "", functionText: "Pain of the back that radiates to the supraclavicular fossa (AMA 100)", category: "Back" },
+  { point: "LI-1", pinyin: "", functionText: "Numbness of the fingers (AMA 100)", category: "Finger" },
+  { point: "LI-2", pinyin: "", functionText: "Pain of the shoulder (A?? 101)", category: "Shoulder" },
+  { point: "LI-2", pinyin: "", functionText: "Pain of the back (AMA 101)", category: "Back" },
+  { point: "LI-2", pinyin: "", functionText: "Stiffness of the shoulder (AMA 101)", category: "Shoulder" },
+  { point: "LI-2", pinyin: "", functionText: "Stiffness of the back (AMA 101)", category: "Back" },
+  { point: "LI-3", pinyin: "", functionText: "Acute stiff neck (AMA 102)", category: "Neck" },
+  { point: "LI-3", pinyin: "", functionText: "Difficulty in flexing the fingers (AMA 102)", category: "Finger" },
+  { point: "LI-3", pinyin: "", functionText: "Difficulty in extending the fingers (AMA 102)", category: "Finger" },
+  { point: "LI-4", pinyin: "", functionText: "Pain of the sinews (AMA 104)", category: "Generalized" },
+  { point: "LI-4", pinyin: "", functionText: "Pain of the bones (AMA 104)", category: "Generalized" },
+  { point: "LI-4", pinyin: "", functionText: "Pain of the arm (AMA 104)", category: "Generalized" },
+  { point: "LI-4", pinyin: "", functionText: "Contraction of the fingers (A?? 104)", category: "Finger" },
+  { point: "LI-4", pinyin: "", functionText: "Pain of the lumbar spine (AM?? 104)", category: "Back" },
+  { point: "LI-5", pinyin: "", functionText: "Pain of the wrist (AMA 107)", category: "Wrist" },
+  { point: "LI-5", pinyin: "", functionText: "Contraction of the five fingers (AMA 107)", category: "Finger" },
+  { point: "LI-5", pinyin: "", functionText: "Difficulty in raising the elbow (AMA 107)", category: "Elbow" },
+  { point: "LI-6", pinyin: "", functionText: "Pain of the wrist (AMA 108)", category: "Wrist" },
+  { point: "LI-6", pinyin: "", functionText: "Pain of the elbow (AMA 108)", category: "Elbow" },
+  { point: "LI-6", pinyin: "", functionText: "Pain of the upper arm (AMA 108)", category: "Generalized" },
+  { point: "LI-7", pinyin: "", functionText: "Pain of the face (AMA 109)", category: "Head" },
+  { point: "LI-7", pinyin: "", functionText: "Pain in raising the shoulder (AMA 109)", category: "Shoulder" },
+  { point: "LI-7", pinyin: "", functionText: "Pain in raising the arm (AMA 109)", category: "Generalized" },
+  { point: "LI-7", pinyin: "", functionText: "Difficulty in raising the shoulder (AMA 109)", category: "Shoulder" },
+  { point: "LI-7", pinyin: "", functionText: "Difficulty in raiding the arm (AMA 109)", category: "Generalized" },
+  { point: "LI-8", pinyin: "", functionText: "Wind-damn painful obstruction (AMA 110)", category: "Generalized" },
+  { point: "LI-8", pinyin: "", functionText: "Cold painful obstruction (AMA 110)", category: "Generalized" },
+  { point: "LI-8", pinyin: "", functionText: "Pain of the elbow (AMA 110)", category: "Elbow" },
+  { point: "LI-8", pinyin: "", functionText: "Pain of the arm (AMA 110)", category: "Generalized" },
+  { point: "LI-9", pinyin: "", functionText: "Pain of the shoulder (A?? 111)", category: "Shoulder" },
+  { point: "LI-9", pinyin: "", functionText: "Numbness of the shoulder (AMA 111)", category: "Shoulder" },
+  { point: "LI-9", pinyin: "", functionText: "Pain of the elbow (AMA 111)", category: "Elbow" },
+  { point: "LI-9", pinyin: "", functionText: "Numbness of the elbow (AMA 111)", category: "Elbow" },
+  { point: "LI-9", pinyin: "", functionText: "Pain of the arm (AMA 111)", category: "Generalized" },
+  { point: "LI-9", pinyin: "", functionText: "Numbness of the arm (AMA 111)", category: "Generalized" },
+  { point: "LI-9", pinyin: "", functionText: "Numbness of the limbs (AMA 111)", category: "Generalized" },
+  { point: "LI-9", pinyin: "", functionText: "Cold sensation of the bone marrow (AMA 111)", category: "Generalized" },
+  { point: "LI-10", pinyin: "", functionText: "Pain of the arm (AMA 111)", category: "Generalized" },
+  { point: "LI-10", pinyin: "", functionText: "Immobility of the arm (AMA 111)", category: "Generalized" },
+  { point: "LI-10", pinyin: "", functionText: "Pain of the shoulder (AMA 111)", category: "Shoulder" },
+  { point: "LI-10", pinyin: "", functionText: "Immobility of the shoulder (AMA 111)", category: "Shoulder" },
+  { point: "LI-10", pinyin: "", functionText: "Paralysis of the arm (AMA 111)", category: "Generalized" },
+  { point: "LI-10", pinyin: "", functionText: "Numbness of the arm (AMA 111)", category: "Generalized" },
+  { point: "LI-10", pinyin: "", functionText: "Atrophy disorder (AMA 111)", category: "Generalized" },
+  { point: "LI-10", pinyin: "", functionText: "Contraction of the elbow (AMA 111)", category: "Elbow" },
+  { point: "LI-10", pinyin: "", functionText: "Inflexibility of the elbow (AMA 111)", category: "Elbow" },
+  { point: "LI-10", pinyin: "", functionText: "Lumbar pain with inability to lie down (AMA 111)", category: "Back" },
+  { point: "LI-11", pinyin: "", functionText: "Pain of the whole body as if bitten by insects (AMA 112)", category: "Generalized" },
+  { point: "LI-11", pinyin: "", functionText: "Itching of the whole body as if bitten by insects (AMA 112)", category: "Generalized" },
+  { point: "LI-11", pinyin: "", functionText: "Numbness of the upper arm (AMA 112)", category: "Generalized" },
+  { point: "LI-11", pinyin: "", functionText: "Strengthens the arms", category: "Generalized" },
+  { point: "LI-11", pinyin: "", functionText: "Pain of the elbow (AMA 112)", category: "Elbow" },
+  { point: "LI-11", pinyin: "", functionText: "Immobility of the shoulder (AMA 112)", category: "Shoulder" },
+  { point: "LI-11", pinyin: "", functionText: "Pain of the shoulder (AMA 112)", category: "Shoulder" },
+  { point: "LI-11", pinyin: "", functionText: "Emaciation of the elbow (AMA 112)", category: "Elbow" },
+  { point: "LI-11", pinyin: "", functionText: "Weakness of the elbow (AMA 112)", category: "Elbow" },
+  { point: "LI-11", pinyin: "", functionText: "Swelling of the arm (AMA 112)", category: "Generalized" },
+  { point: "LI-11", pinyin: "", functionText: "Atrophy disorder of the lower limbs (AMA 112)", category: "Legs" },
+  { point: "LI-11", pinyin: "", functionText: "Pain of the ankle (AMA 112)", category: "Ankle" },
+  { point: "LI-11", pinyin: "", functionText: "Swelling of the ankle (AMA 112)", category: "Ankle" },
+  { point: "LI-12", pinyin: "", functionText: "Contraction (AMA 114)", category: "Generalized" },
+  { point: "LI-12", pinyin: "", functionText: "Numbness of the upper arm (AMA 114)", category: "Generalized" },
+  { point: "LI-12", pinyin: "", functionText: "Immobility of the upper arm (AMA 114)", category: "Generalized" },
+  { point: "LI-12", pinyin: "", functionText: "Pain of the elbow (AMA 114)", category: "Elbow" },
+  { point: "LI-12", pinyin: "", functionText: "Stiffness of the elbow (AMA 114)", category: "Elbow" },
+  { point: "LI-13", pinyin: "", functionText: "Pain (A?? 115)", category: "Generalized" },
+  { point: "LI-13", pinyin: "", functionText: "Numbness of the elbow (AMA 115)", category: "Elbow" },
+  { point: "LI-13", pinyin: "", functionText: "Numbness of the upper arm (AMA 115)", category: "Generalized" },
+  { point: "LI-13", pinyin: "", functionText: "Contraction of the elbow (AMA 115)", category: "Elbow" },
+  { point: "LI-13", pinyin: "", functionText: "Contraction of the upper arm (AMA 115)", category: "Generalized" },
+  { point: "LI-13", pinyin: "", functionText: "Inability to raise the arm (AMA 115)", category: "Generalized" },
+  { point: "LI-13", pinyin: "", functionText: "Shoulder pain (AMA 115)", category: "Shoulder" },
+  { point: "LI-14", pinyin: "", functionText: "Pain (A?? 115)", category: "Generalized" },
+  { point: "LI-14", pinyin: "", functionText: "Numbness (A?? 115)", category: "Generalized" },
+  { point: "LI-14", pinyin: "", functionText: "Painful obstruction of the upper arm (AMA 115)", category: "Generalized" },
+  { point: "LI-14", pinyin: "", functionText: "Painful obstruction of the shoulder (AMA 115)", category: "Shoulder" },
+  { point: "LI-14", pinyin: "", functionText: "Wasting of the upper arm (A?? 115)", category: "Generalized" },
+  { point: "LI-14", pinyin: "", functionText: "Weakness of the upper arm (AMA 115)", category: "Generalized" },
+  { point: "LI-14", pinyin: "", functionText: "Inability to raise the arm (AMA 115)", category: "Generalized" },
+  { point: "LI-14", pinyin: "", functionText: "Contraction of the neck (AMA 115)", category: "Neck" },
+  { point: "LI-14", pinyin: "", functionText: "Stiffness of the neck (AMA 115)", category: "Neck" },
+  { point: "LI-15", pinyin: "", functionText: "Shoulder pain (AMA 116)", category: "Shoulder" },
+  { point: "LI-15", pinyin: "", functionText: "Weakness of the shoulder (AMA 116)", category: "Shoulder" },
+  { point: "LI-15", pinyin: "", functionText: "Wind-damp of the shoulder (AMA 116)", category: "Shoulder" },
+  { point: "LI-15", pinyin: "", functionText: "Swelling in the shoulder (AMA 116)", category: "Shoulder" },
+  { point: "LI-15", pinyin: "", functionText: "Inability to raise the arm to the head (AMA 116)", category: "Shoulder" },
+  { point: "LI-15", pinyin: "", functionText: "Contraction of the arm (AMA 116)", category: "Generalized" },
+  { point: "LI-15", pinyin: "", functionText: "Numbness of the arm (AMA 116)", category: "Generalized" },
+  { point: "LI-16", pinyin: "", functionText: "Pain of the shoulder (AMA 117)", category: "Shoulder" },
+  { point: "LI-16", pinyin: "", functionText: "Pain of the back (AMA 117)", category: "Back" },
+  { point: "LI-16", pinyin: "", functionText: "Blood stasis in the shoulder (AMA 117)", category: "Shoulder" },
+  { point: "LI-16", pinyin: "", functionText: "Difficulty in moving the arm (AMA 117)", category: "Generalized" },
+  { point: "LI-16", pinyin: "", functionText: "Difficulty in raising the arm (A?? 117)", category: "Generalized" },
+  { point: "LI-16", pinyin: "", functionText: "Pain of the upper arm (AMA 117)", category: "Generalized" },
+  { point: "LI-19", pinyin: "", functionText: "Lockjaw (AMA 119)", category: "Head" },
+  { point: "ST-4", pinyin: "", functionText: "Swelling of the leg (AMA 132)", category: "Legs" },
+  { point: "ST-6", pinyin: "", functionText: "Lockjaw (AMA 134)", category: "Head" },
+  { point: "ST-6", pinyin: "", functionText: "Stiffness of the neck (AMA 134)", category: "Neck" },
+  { point: "ST-6", pinyin: "", functionText: "Pain of the neck (AMA 134)", category: "Neck" },
+  { point: "ST-7", pinyin: "", functionText: "Lockjaw (AMA 135)", category: "Head" },
+  { point: "ST-9", pinyin: "", functionText: "Lumbar pain (AMA 137)", category: "Back" },
+  { point: "ST-10", pinyin: "", functionText: "Swelling of the shoulder (AMA 139)", category: "Shoulder" },
+  { point: "ST-10", pinyin: "", functionText: "Pain of the shoulder (AMA 139)", category: "Shoulder" },
+  { point: "ST-11", pinyin: "", functionText: "Stiffness of the neck with inability to turn the neck (AMA 139)", category: "Neck" },
+  { point: "ST-12", pinyin: "", functionText: "Pain of the supraclavicular fossa (A?? 140)", category: "Shoulder" },
+  { point: "ST-12", pinyin: "", functionText: "Pain of the shoulder that radiates to the neck (AMA 140)", category: "Shoulder" },
+  { point: "ST-12", pinyin: "", functionText: "Numbness of the upper limb (AMA 140)", category: "Generalized" },
+  { point: "ST-12", pinyin: "", functionText: "Painful obstruction of the upper limb (AMA 140)", category: "Generalized" },
+  { point: "ST-12", pinyin: "", functionText: "Inability to raise the arm (AMA 140)", category: "Generalized" },
+  { point: "ST-12", pinyin: "", functionText: "Lumbar pain with inability to turn (AMA 140)", category: "Back" },
+  { point: "ST-13", pinyin: "", functionText: "Pain of the chest (AMA 140)", category: "Generalized" },
+  { point: "ST-13", pinyin: "", functionText: "Pain of the upper back (AMA 140)", category: "Back" },
+  { point: "ST-13", pinyin: "", functionText: "Stiffness of the neck (AMA 140)", category: "Neck" },
+  { point: "ST-13", pinyin: "", functionText: "Inability to turn the head (AMA 140)", category: "Head" },
+  { point: "ST-15", pinyin: "", functionText: "Alleviates itching of the skin (AMA 142)", category: "Generalized" },
+  { point: "ST-15", pinyin: "", functionText: "Pain of the lateral costal region (AMA 142)", category: "Generalized" },
+  { point: "ST-15", pinyin: "", functionText: "Pain of the skin (AMA 142)", category: "Generalized" },
+  { point: "ST-15", pinyin: "", functionText: "Heaviness of the body (AMA 142)", category: "Generalized" },
+  { point: "ST-15", pinyin: "", functionText: "Pain of the limbs (AMA 142)", category: "Generalized" },
+  { point: "ST-15", pinyin: "", functionText: "Weakness of the limbs (AMA 142)", category: "Generalized" },
+  { point: "ST-18", pinyin: "", functionText: "Swelling of the arm (AMA 143)", category: "Generalized" },
+  { point: "ST-18", pinyin: "", functionText: "Pain of the arm (AMA 143)", category: "Generalized" },
+  { point: "ST-19", pinyin: "", functionText: "Pain of the chest (AMA 144)", category: "Generalized" },
+  { point: "ST-19", pinyin: "", functionText: "Pain of the back (AMA 144)", category: "Back" },
+  { point: "ST-19", pinyin: "", functionText: "Pain of the shoulder (AMA 144)", category: "Shoulder" },
+  { point: "ST-19", pinyin: "", functionText: "Pain of the intercostal region (AMA 144)", category: "Generalized" },
+  { point: "ST-20", pinyin: "", functionText: "Pain of the lateral costal region (AMA 145)", category: "Generalized" },
+  { point: "ST-30", pinyin: "", functionText: "Pain of the lumbar region with difficulty in turning (AMA 153)", category: "Back" },
+  { point: "ST-31", pinyin: "", functionText: "Dispels wind-damp (A??? 154)", category: "Generalized" },
+  { point: "ST-31", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 154)", category: "Legs" },
+  { point: "ST-31", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 154)", category: "Legs" },
+  { point: "ST-31", pinyin: "", functionText: "Cold damp leg qi (AMA 154)", category: "Legs" },
+  { point: "ST-31", pinyin: "", functionText: "Pain of the hip joint (AMA 154)", category: "Hips" },
+  { point: "ST-31", pinyin: "", functionText: "Pain of the thigh (AMA 154)", category: "Legs" },
+  { point: "ST-31", pinyin: "", functionText: "Sciatica (AMA 154)", category: "Legs" },
+  { point: "ST-31", pinyin: "", functionText: "Contraction of the thigh muscles (AMA 154)", category: "Legs" },
+  { point: "ST-31", pinyin: "", functionText: "Cold painful obstruction of the knees (AMA 154)", category: "Knee" },
+  { point: "ST-31", pinyin: "", functionText: "Inability to extend the knee (AMA 154)", category: "Knee" },
+  { point: "ST-31", pinyin: "", functionText: "Inability to bend the knee (A?? 154)", category: "Knee" },
+  { point: "ST-31", pinyin: "", functionText: "Lumbar pain (AMA 154)", category: "Back" },
+  { point: "ST-32", pinyin: "", functionText: "Dispels wind-damp (A?? 155)", category: "Generalized" },
+  { point: "ST-32", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 155)", category: "Legs" },
+  { point: "ST-32", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 155)", category: "Legs" },
+  { point: "ST-32", pinyin: "", functionText: "Numbness (A?? 155)", category: "Generalized" },
+  { point: "ST-32", pinyin: "", functionText: "Contraction of the muscles of the thigh (AMA 155)", category: "Legs" },
+  { point: "ST-32", pinyin: "", functionText: "Coldness of the knee (AMA 155)", category: "Knee" },
+  { point: "ST-32", pinyin: "", functionText: "Pain of the knee (AMA 155)", category: "Knee" },
+  { point: "ST-32", pinyin: "", functionText: "Weakness of the knee (AMA 155)", category: "Knee" },
+  { point: "ST-32", pinyin: "", functionText: "Lumbar pain (AMA 155)", category: "Back" },
+  { point: "ST-32", pinyin: "", functionText: "Contraction of the arm (AMA 155)", category: "Generalized" },
+  { point: "ST-33", pinyin: "", functionText: "Dispels wind-damp (A?? 156)", category: "Generalized" },
+  { point: "ST-33", pinyin: "", functionText: "Sensation like cold water in the lumbar region (AMA 156)", category: "Back" },
+  { point: "ST-33", pinyin: "", functionText: "Sensation like cold water in the legs (AMA 156)", category: "Legs" },
+  { point: "ST-33", pinyin: "", functionText: "Difficulty in stretching (AMA 156)", category: "Generalized" },
+  { point: "ST-33", pinyin: "", functionText: "Difficulty in bending the leg (AMA 156)", category: "Generalized" },
+  { point: "ST-33", pinyin: "", functionText: "Atrophy disorder of the led (AMA 156)", category: "Legs" },
+  { point: "ST-33", pinyin: "", functionText: "Painful obstruction of the leg (AMA 156)", category: "Legs" },
+  { point: "ST-33", pinyin: "", functionText: "Weakness of the leg (AMA 156)", category: "Legs" },
+  { point: "ST-33", pinyin: "", functionText: "Weakness of the knee (AMA 156)", category: "Knee" },
+  { point: "ST-33", pinyin: "", functionText: "Pain of the thigh (AMA 156)", category: "Legs" },
+  { point: "ST-33", pinyin: "", functionText: "Pain of the knee (AMA 156)", category: "Knee" },
+  { point: "ST-34", pinyin: "", functionText: "Moderates acute conditions (AMA 156)", category: "Generalized" },
+  { point: "ST-34", pinyin: "", functionText: "Swelling of the knee (AMA 156)", category: "Knee" },
+  { point: "ST-34", pinyin: "", functionText: "Pain of the knee (AMA 156)", category: "Knee" },
+  { point: "ST-34", pinyin: "", functionText: "Pain of the leg (AMA 156)", category: "Legs" },
+  { point: "ST-34", pinyin: "", functionText: "Difficulty in flexing the knee (A?? 156)", category: "Knee" },
+  { point: "ST-34", pinyin: "", functionText: "Difficulty in extending the knee (AMA 156)", category: "Knee" },
+  { point: "ST-34", pinyin: "", functionText: "Crane's knee wind (pain, stiffness, feelings of cold, and possible swelling) (AMA 156)", category: "Knee" },
+  { point: "ST-34", pinyin: "", functionText: "Difficulty in walking (AMA 156)", category: "Generalized" },
+  { point: "ST-34", pinyin: "", functionText: "Painful obstruction of the shin (AMA 156)", category: "Legs" },
+  { point: "ST-34", pinyin: "", functionText: "Cold painful obstruction with numbness (AMA 156)", category: "Generalized" },
+  { point: "ST-34", pinyin: "", functionText: "Cold of the legs (AMA 156)", category: "Legs" },
+  { point: "ST-34", pinyin: "", functionText: "Cold of the feet (AMA 156)", category: "Foot" },
+  { point: "ST-34", pinyin: "", functionText: "Lumbar pain (AMA 156)", category: "Back" },
+  { point: "ST-35", pinyin: "", functionText: "Swelling of the knee joint (AMA 157)", category: "Knee" },
+  { point: "ST-35", pinyin: "", functionText: "Pain of the knee joint (AMA 157)", category: "Knee" },
+  { point: "ST-35", pinyin: "", functionText: "Difficulty in flexing the knee (AMA 157)", category: "Knee" },
+  { point: "ST-35", pinyin: "", functionText: "Difficulty in extending the knee (AMA 157)", category: "Knee" },
+  { point: "ST-35", pinyin: "", functionText: "Weakness of the knee joint (A?? 157)", category: "Knee" },
+  { point: "ST-35", pinyin: "", functionText: "Numbness of the knee (AMA 157)", category: "Knee" },
+  { point: "ST-35", pinyin: "", functionText: "Numbness of the lower limb (AMA 157)", category: "Legs" },
+  { point: "ST-35", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 157)", category: "Legs" },
+  { point: "ST-36", pinyin: "", functionText: "Heaviness of the four limbs (AMA 158)", category: "Generalized" },
+  { point: "ST-36", pinyin: "", functionText: "The five taxations (AMA 158)", category: "Generalized" },
+  { point: "ST-36", pinyin: "", functionText: "The seven injuries (AMA 158)", category: "Generalized" },
+  { point: "ST-36", pinyin: "", functionText: "Pain of the lateral costal region (AMA 158)", category: "Generalized" },
+  { point: "ST-36", pinyin: "", functionText: "Lockjaw (AMA 158)", category: "Head" },
+  { point: "ST-36", pinyin: "", functionText: "Pain of the knee (AMA 158)", category: "Knee" },
+  { point: "ST-36", pinyin: "", functionText: "Pain of the shin (AMA 158)", category: "Legs" },
+  { point: "ST-36", pinyin: "", functionText: "Pain of the thigh (AMA 158)", category: "Legs" },
+  { point: "ST-36", pinyin: "", functionText: "Muscle pain (AMA 158)", category: "Generalized" },
+  { point: "ST-36", pinyin: "", functionText: "Chronic painful obstruction (AMA 158)", category: "Generalized" },
+  { point: "ST-36", pinyin: "", functionText: "Lumbar pain with inability to turn (AMA 158)", category: "Back" },
+  { point: "ST-37", pinyin: "", functionText: "Numbness of the lower limb (AMA 162)", category: "Legs" },
+  { point: "ST-37", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 162)", category: "Legs" },
+  { point: "ST-37", pinyin: "", functionText: "Coldness of the bone marrow (AMA 162)", category: "Generalized" },
+  { point: "ST-37", pinyin: "", functionText: "Pain of the bone marrow (AMA 162)", category: "Generalized" },
+  { point: "ST-37", pinyin: "", functionText: "Weakness of the leg (AMA 162)", category: "Legs" },
+  { point: "ST-37", pinyin: "", functionText: "Contraction of the front of the shin (AMA 162)", category: "Legs" },
+  { point: "ST-37", pinyin: "", functionText: "Pain of the front of the shin (AMA 162)", category: "Legs" },
+  { point: "ST-37", pinyin: "", functionText: "Swelling of the knee (AMA 162)", category: "Knee" },
+  { point: "ST-38", pinyin: "", functionText: "Atrophy disorder (AMA 163)", category: "Generalized" },
+  { point: "ST-38", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 163)", category: "Legs" },
+  { point: "ST-38", pinyin: "", functionText: "Damp painful obstruction (AMA 163)", category: "Generalized" },
+  { point: "ST-38", pinyin: "", functionText: "Numbness (AMA 163)", category: "Generalized" },
+  { point: "ST-38", pinyin: "", functionText: "Coldness (AMA 163)", category: "Generalized" },
+  { point: "ST-38", pinyin: "", functionText: "Swelling of the shin (AMA 163)", category: "Legs" },
+  { point: "ST-38", pinyin: "", functionText: "Pain of the shin (AMA 163)", category: "Legs" },
+  { point: "ST-38", pinyin: "", functionText: "Inability to stand for long (AMA 163)", category: "Legs" },
+  { point: "ST-38", pinyin: "", functionText: "Swelling of the thigh (AMA 163)", category: "Legs" },
+  { point: "ST-38", pinyin: "", functionText: "Swelling of the knee (AMA 163)", category: "Knee" },
+  { point: "ST-38", pinyin: "", functionText: "Pain of the shoulder (AMA 163)", category: "Shoulder" },
+  { point: "ST-38", pinyin: "", functionText: "Stiffness of the shoulder (AMA 163)", category: "Shoulder" },
+  { point: "ST-39", pinyin: "", functionText: "Clears damp-heat (AMA 164)", category: "Generalized" },
+  { point: "ST-39", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 164)", category: "Legs" },
+  { point: "ST-39", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 164)", category: "Legs" },
+  { point: "ST-39", pinyin: "", functionText: "Pain of the heel (AMA 164)", category: "Foot" },
+  { point: "ST-39", pinyin: "", functionText: "Extreme sensation of cold in the shoulder (AMA 164)", category: "Shoulder" },
+  { point: "ST-39", pinyin: "", functionText: "Extreme sensation of heat in the shoulder (AMA 164)", category: "Shoulder" },
+  { point: "ST-39", pinyin: "", functionText: "Heat sensation in the area between the ring and little fingers (AMA 164)", category: "Finger" },
+  { point: "ST-40", pinyin: "", functionText: "Stabbing pain of the chest (AMA 166)", category: "Generalized" },
+  { point: "ST-40", pinyin: "", functionText: "Damp body (A?? 166)", category: "Generalized" },
+  { point: "ST-40", pinyin: "", functionText: "Slackness of the body (AMA 166)", category: "Generalized" },
+  { point: "ST-40", pinyin: "", functionText: "Heaviness of the body (AMA 166)", category: "Generalized" },
+  { point: "ST-40", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 166)", category: "Legs" },
+  { point: "ST-40", pinyin: "", functionText: "Pain of the knee (AMA 166)", category: "Knee" },
+  { point: "ST-40", pinyin: "", functionText: "Pain of the leg (AMA 166)", category: "Legs" },
+  { point: "ST-40", pinyin: "", functionText: "Difficulty in flexing the knee (AMA 166)", category: "Knee" },
+  { point: "ST-40", pinyin: "", functionText: "Difficulty in extending the knee (AMA 166)", category: "Knee" },
+  { point: "ST-40", pinyin: "", functionText: "Lack of control of the legs (A?? 166)", category: "Legs" },
+  { point: "ST-40", pinyin: "", functionText: "Withering of the lower legs (AMA 166)", category: "Legs" },
+  { point: "ST-41", pinyin: "", functionText: "Pain of the ankle joint (AMA 168)", category: "Ankle" },
+  { point: "ST-41", pinyin: "", functionText: "Drop-foot (AMA 168)", category: "Foot" },
+  { point: "ST-41", pinyin: "", functionText: "Atrophy disorder of the leg (A?? 168)", category: "Legs" },
+  { point: "ST-41", pinyin: "", functionText: "Heaviness of the knee (AMA 168)", category: "Knee" },
+  { point: "ST-41", pinyin: "", functionText: "Heaviness of the thigh (AMA 168)", category: "Legs" },
+  { point: "ST-41", pinyin: "", functionText: "Sciatica (AMA 168)", category: "Legs" },
+  { point: "ST-41", pinyin: "", functionText: "Sinew painful obstruction (AMA 168)", category: "Generalized" },
+  { point: "ST-41", pinyin: "", functionText: "Damp painful obstruction (AMA 168)", category: "Generalized" },
+  { point: "ST-41", pinyin: "", functionText: "Injury of the big toe (AMA 168)", category: "Toes" },
+  { point: "ST-42", pinyin: "", functionText: "Swelling of the dorsum of the foot (AMA 169)", category: "Foot" },
+  { point: "ST-42", pinyin: "", functionText: "Pain of the dorsum of the foot (AMA 169)", category: "Foot" },
+  { point: "ST-42", pinyin: "", functionText: "Atrophy disorder of the foot (A?? 169)", category: "Foot" },
+  { point: "ST-43", pinyin: "", functionText: "Swelling of the dorsum of the foot (A?? 170)", category: "Foot" },
+  { point: "ST-43", pinyin: "", functionText: "Pain of the dorsum of the foot (AMA 170)", category: "Foot" },
+  { point: "ST-43", pinyin: "", functionText: "Difficulty in flexing the toes (AMA 170)", category: "Toes" },
+  { point: "ST-43", pinyin: "", functionText: "Difficulty in extending the toes (AMA 170)", category: "Toes" },
+  { point: "ST-44", pinyin: "", functionText: "Pain of the dorsum of the foot (AMA 171)", category: "Foot" },
+  { point: "ST-44", pinyin: "", functionText: "Swelling of the dorsum of the foot (AMA 171)", category: "Foot" },
+  { point: "ST-44", pinyin: "", functionText: "Pain of the skin of the chest (AMA 171)", category: "Generalized" },
+  { point: "ST-45", pinyin: "", functionText: "Lockjaw (AMA 173)", category: "Head" },
+  { point: "ST-45", pinyin: "", functionText: "Sensation of cold in the shin (AMA 173)", category: "Legs" },
+  { point: "ST-45", pinyin: "", functionText: "Cold of the lower limbs (AMA 173)", category: "Legs" },
+  { point: "ST-45", pinyin: "", functionText: "Cold of the feet (AMA 173)", category: "Foot" },
+  { point: "ST-45", pinyin: "", functionText: "Swelling of the knee (AMA 173)", category: "Knee" },
+  { point: "ST-45", pinyin: "", functionText: "Pain of the knee (AMA 173)", category: "Knee" },
+  { point: "SP-1", pinyin: "", functionText: "Cold feet (AMA 182)", category: "Foot" },
+  { point: "SP-1", pinyin: "", functionText: "Cold sensation in the lower leg (AMA 182)", category: "Legs" },
+  { point: "SP-2", pinyin: "", functionText: "Lumbar pain with inability to turn (AMA 183)", category: "Back" },
+  { point: "SP-2", pinyin: "", functionText: "Disorders of the big toe (AMA 183)", category: "Toes" },
+  { point: "SP-3", pinyin: "", functionText: "Pain of the knee (AMA 185)", category: "Knee" },
+  { point: "SP-3", pinyin: "", functionText: "Pain of the thigh (AMA 185)", category: "Legs" },
+  { point: "SP-3", pinyin: "", functionText: "Joint pains (A?? 185)", category: "Generalized" },
+  { point: "SP-3", pinyin: "", functionText: "Lumbar pain (AMA 185)", category: "Back" },
+  { point: "SP-3", pinyin: "", functionText: "Atrophy disorder (AMA 185)", category: "Generalized" },
+  { point: "SP-4", pinyin: "", functionText: "Pain of the heel (AMA 186)", category: "Foot" },
+  { point: "SP-5", pinyin: "", functionText: "Pain of the sinews (AMA 188)", category: "Generalized" },
+  { point: "SP-5", pinyin: "", functionText: "Contraction of the sinews (AMA 188)", category: "Generalized" },
+  { point: "SP-5", pinyin: "", functionText: "Lockjaw (AMA 188)", category: "Head" },
+  { point: "SP-5", pinyin: "", functionText: "Ankle pain (A?? 188)", category: "Ankle" },
+  { point: "SP-5", pinyin: "", functionText: "Pain of the inner thigh (AMA 188)", category: "Legs" },
+  { point: "SP-5", pinyin: "", functionText: "Bone painful obstruction (AMA 188)", category: "Generalized" },
+  { point: "SP-5", pinyin: "", functionText: "Heavy body with painful joints (AMA 188)", category: "Generalized" },
+  { point: "SP-6", pinyin: "", functionText: "Heavy body with heaviness of the four limbs (AMA 190)", category: "Generalized" },
+  { point: "SP-6", pinyin: "", functionText: "Leg pain (AMA 190)", category: "Legs" },
+  { point: "SP-6", pinyin: "", functionText: "Crane's knee (AMA 190)", category: "Knee" },
+  { point: "SP-6", pinyin: "", functionText: "Damp painful obstruction of the lower limbs (AMA 190)", category: "Legs" },
+  { point: "SP-6", pinyin: "", functionText: "Shin pain (AMA 190)", category: "Legs" },
+  { point: "SP-7", pinyin: "", functionText: "Paralysis of the legs (A?? 192)", category: "Legs" },
+  { point: "SP-7", pinyin: "", functionText: "Painful obstruction of the knees (AMA 192)", category: "Knee" },
+  { point: "SP-8", pinyin: "", functionText: "Lumbar pain (AMA 193)", category: "Back" },
+  { point: "SP-9", pinyin: "", functionText: "Lumbar pain (AMA 194)", category: "Back" },
+  { point: "SP-9", pinyin: "", functionText: "Pain of the knee (AMA 194)", category: "Knee" },
+  { point: "SP-9", pinyin: "", functionText: "Swelling of the knee (AMA 194)", category: "Knee" },
+  { point: "SP-9", pinyin: "", functionText: "Painful obstruction of the leg (AMA 194)", category: "Legs" },
+  { point: "SP-10", pinyin: "", functionText: "Pain of the inner aspect of the thigh (AMA 196)", category: "Legs" },
+  { point: "SP-11", pinyin: "", functionText: "Pain of the inguinal region (AMA 198)", category: "Generalized" },
+  { point: "SP-11", pinyin: "", functionText: "Swelling of the inguinal region (AMA 198)", category: "Generalized" },
+  { point: "SP-11", pinyin: "", functionText: "Pain of the lower abdomen (AMA 198)", category: "Generalized" },
+  { point: "SP-12", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 198)", category: "Legs" },
+  { point: "SP-13", pinyin: "", functionText: "Pain of the lateral costal region (AMA 199)", category: "Generalized" },
+  { point: "SP-13", pinyin: "", functionText: "Pain of the thigh (AMA 199)", category: "Legs" },
+  { point: "SP-15", pinyin: "", functionText: "Inability to raise the four limbs (AMA 200)", category: "Generalized" },
+  { point: "SP-15", pinyin: "", functionText: "Inability to move the four limbs (AMA 200)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Firms the sinews (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Firms the joints (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Benefits the lateral costal region (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Pain of the whole body (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Weariness of the four limbs (A?? 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Flaccidity of the limbs (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Flaccidity of the hundred joints (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Pain in the lateral costal region on respiration (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Pain in the chest on respiration (AMA 204)", category: "Generalized" },
+  { point: "SP-21", pinyin: "", functionText: "Distention of the lateral costal region (AMA 204)", category: "Generalized" },
+  { point: "HT-1", pinyin: "", functionText: "Pain of the axilla (AMA 213)", category: "Generalized" },
+  { point: "HT-1", pinyin: "", functionText: "Numbness of the upper limb (AMA 213)", category: "Generalized" },
+  { point: "HT-1", pinyin: "", functionText: "Painful obstruction of the upper limb (AMA 213)", category: "Generalized" },
+  { point: "HT-1", pinyin: "", functionText: "Pain of the elbow (AMA 213)", category: "Elbow" },
+  { point: "HT-1", pinyin: "", functionText: "Pain of the arm (AMA 213)", category: "Generalized" },
+  { point: "HT-1", pinyin: "", functionText: "Loss of the use of the four limbs (AMA 213)", category: "Generalized" },
+  { point: "HT-2", pinyin: "", functionText: "Pain of the shoulder (AMA 213)", category: "Shoulder" },
+  { point: "HT-2", pinyin: "", functionText: "Pain of the lateral costal region (AMA 213)", category: "Generalized" },
+  { point: "HT-3", pinyin: "", functionText: "Pain of the axilla (AMA 214)", category: "Generalized" },
+  { point: "HT-3", pinyin: "", functionText: "Pain of the lateral costal region (AMA 214)", category: "Generalized" },
+  { point: "HT-4", pinyin: "", functionText: "Cold bones (AMA 215)", category: "Generalized" },
+  { point: "HT-4", pinyin: "", functionText: "Clonic spasm (AMA 215)", category: "Generalized" },
+  { point: "HT-4", pinyin: "", functionText: "Contraction of the elbow and arm (AMA 215)", category: "Elbow" },
+  { point: "HT-4", pinyin: "", functionText: "Swelling of the fingers (AMA 215)", category: "Finger" },
+  { point: "HT-4", pinyin: "", functionText: "Pain of the fingers (AMA 215)", category: "Finger" },
+  { point: "HT-5", pinyin: "", functionText: "Pain of the wrist (AMA 216)", category: "Wrist" },
+  { point: "HT-5", pinyin: "", functionText: "Pain of the elbow (AMA 216)", category: "Elbow" },
+  { point: "HT-5", pinyin: "", functionText: "Heaviness of the wrist (AMA 216)", category: "Wrist" },
+  { point: "HT-5", pinyin: "", functionText: "Heaviness of the elbow (AMA 216)", category: "Elbow" },
+  { point: "HT-5", pinyin: "", functionText: "Contraction of the fingers (AMA 216)", category: "Finger" },
+  { point: "HT-5", pinyin: "", functionText: "Pain of the elbow (AMA 216)", category: "Elbow" },
+  { point: "HT-5", pinyin: "", functionText: "Pain of the upper arm (AMA 216)", category: "Generalized" },
+  { point: "HT-5", pinyin: "", functionText: "Paralysis of the four limbs (AMA 216)", category: "Generalized" },
+  { point: "HT-6", pinyin: "", functionText: "Steaming bone disorder (AMA 218)", category: "Generalized" },
+  { point: "HT-8", pinyin: "", functionText: "Contraction of the little finger (AMA 221)", category: "Finger" },
+  { point: "HT-8", pinyin: "", functionText: "Contraction of the hand (AMA 221)", category: "Hand" },
+  { point: "HT-8", pinyin: "", functionText: "Pain of the arm (AMA 221)", category: "Generalized" },
+  { point: "HT-8", pinyin: "", functionText: "Contraction of the elbow (AMA 221)", category: "Elbow" },
+  { point: "HT-8", pinyin: "", functionText: "Contraction of the axilla (AMA 221)", category: "Generalized" },
+  { point: "HT-9", pinyin: "", functionText: "Pain of the chest (AMA 222)", category: "Generalized" },
+  { point: "HT-9", pinyin: "", functionText: "Pain of the lateral costal region (AMA 222)", category: "Generalized" },
+  { point: "HT-9", pinyin: "", functionText: "Contraction of the hand (AMA 222)", category: "Hand" },
+  { point: "HT-9", pinyin: "", functionText: "Pain of the arm (AMA 222)", category: "Generalized" },
+  { point: "HT-9", pinyin: "", functionText: "Inability to extend the elbow (??? 222)", category: "Elbow" },
+  { point: "HT-9", pinyin: "", functionText: "Pain of the palm that radiates to the elbow (AMA 222)", category: "Elbow" },
+  { point: "HT-9", pinyin: "", functionText: "Pain of the palm that radiates to the axilla (AMA 222)", category: "Generalized" },
+  { point: "HT-9", pinyin: "", functionText: "Pain of the palm that radiated to the chest (AMA 222)", category: "Generalized" },
+  { point: "SI-1", pinyin: "", functionText: "Pain in the lateral costal region (AMA 231)", category: "Generalized" },
+  { point: "SI-1", pinyin: "", functionText: "Stiff neck (AMA 231)", category: "Neck" },
+  { point: "SI-1", pinyin: "", functionText: "Pain in the posterior-lateral shoulder (AMA 231)", category: "Shoulder" },
+  { point: "SI-1", pinyin: "", functionText: "Pain in the posterior-lateral upper arm (AMA 231)", category: "Generalized" },
+  { point: "SI-1", pinyin: "", functionText: "Pain in the elbow (AMA 231)", category: "Elbow" },
+  { point: "SI-1", pinyin: "", functionText: "Trembling of the arm (AMA 231)", category: "Generalized" },
+  { point: "SI-1", pinyin: "", functionText: "Numbness of the arm (AMA 231)", category: "Generalized" },
+  { point: "SI-2", pinyin: "", functionText: "Stiffness in the back (A?? 232)", category: "Back" },
+  { point: "SI-2", pinyin: "", functionText: "Pain in the scapula with inability to raise the arm (AMA 232)", category: "Shoulder" },
+  { point: "SI-2", pinyin: "", functionText: "Wrist pain (AMA 232)", category: "Wrist" },
+  { point: "SI-2", pinyin: "", functionText: "Pain in the neck (AMA 232)", category: "Neck" },
+  { point: "SI-3", pinyin: "", functionText: "Pain in the neck (CAM 167) (??? 233)", category: "Neck" },
+  { point: "SI-3", pinyin: "", functionText: "Stiffness in the neck (AMA 233)", category: "Neck" },
+  { point: "SI-3", pinyin: "", functionText: "Rigidity of the neck (CAM 167) (AMA 233)", category: "Neck" },
+  { point: "SI-3", pinyin: "", functionText: "Difficulty turning the neck (AMA 233)", category: "Neck" },
+  { point: "SI-3", pinyin: "", functionText: "Contraction of the fingers (AMA 233)", category: "Finger" },
+  { point: "SI-3", pinyin: "", functionText: "Pain in the fingers (AMA 233)", category: "Finger" },
+  { point: "SI-3", pinyin: "", functionText: "Pain in the shoulder (CAM 167) (AMA 233)", category: "Shoulder" },
+  { point: "SI-3", pinyin: "", functionText: "Pain in the elbow (CAM 167) (AMA 233)", category: "Elbow" },
+  { point: "SI-3", pinyin: "", functionText: "Contraction of the elbow (AMA 233)", category: "Elbow" },
+  { point: "SI-3", pinyin: "", functionText: "Pain in the arm (AMA 233)", category: "Generalized" },
+  { point: "SI-3", pinyin: "", functionText: "Pain in the back (AMA 233)", category: "Back" },
+  { point: "SI-3", pinyin: "", functionText: "Pain in the knees (AMA 233)", category: "Knee" },
+  { point: "SI-4", pinyin: "", functionText: "Rigidity of the neck (CAM 168) (AMA 235)", category: "Neck" },
+  { point: "SI-4", pinyin: "", functionText: "Contraction of the fingers with inability to flex and extend (AMA 235)", category: "Finger" },
+  { point: "SI-4", pinyin: "", functionText: "Pain in the wrist (CAM 168) (??? 235)", category: "Wrist" },
+  { point: "SI-4", pinyin: "", functionText: "Weakness in the wrist (AMA 235)", category: "Wrist" },
+  { point: "SI-4", pinyin: "", functionText: "Contraction of the elbow (AMA 235)", category: "Elbow" },
+  { point: "SI-4", pinyin: "", functionText: "Contraction of the elbow with inability to flex or extend (AMA 235)", category: "Elbow" },
+  { point: "SI-4", pinyin: "", functionText: "Pain in the shoulder (AMA 235)", category: "Shoulder" },
+  { point: "SI-4", pinyin: "", functionText: "Coldness of the shoulder (AMA 235)", category: "Shoulder" },
+  { point: "SI-4", pinyin: "", functionText: "Coldness of the back (AMA 235)", category: "Back" },
+  { point: "SI-4", pinyin: "", functionText: "Pain in the lateral costal regions with inability to catch the breath (AMA 235)", category: "Generalized" },
+  { point: "SI-4", pinyin: "", functionText: "Lumbar pain radiating to the leg (AMA 235)", category: "Back" },
+  { point: "SI-5", pinyin: "", functionText: "Pain in the arm (AMA 236)", category: "Generalized" },
+  { point: "SI-5", pinyin: "", functionText: "Pain in the shoulder (AMA 236)", category: "Shoulder" },
+  { point: "SI-5", pinyin: "", functionText: "Shoulder pain with the inability to dress oneself (AMA 236)", category: "Shoulder" },
+  { point: "SI-6", pinyin: "", functionText: "Pain in the shoulder (CAM 168) (AMA 237)", category: "Shoulder" },
+  { point: "SI-6", pinyin: "", functionText: "Pain in the shoulder as if it were broken (AMA 237)", category: "Shoulder" },
+  { point: "SI-6", pinyin: "", functionText: "Pain in the upper arm as if it were dislocated (AMA 237)", category: "Generalized" },
+  { point: "SI-6", pinyin: "", functionText: "Stiffness in the shoulder (AMA 237)", category: "Shoulder" },
+  { point: "SI-6", pinyin: "", functionText: "Stiffness in the back (AMA 237)", category: "Back" },
+  { point: "SI-6", pinyin: "", functionText: "Pain in the back (AMA 237)", category: "Back" },
+  { point: "SI-6", pinyin: "", functionText: "Heaviness in the lumbar region (AMA 237)", category: "Back" },
+  { point: "SI-6", pinyin: "", functionText: "Pain in the lumber region (AMA 237)", category: "Back" },
+  { point: "SI-6", pinyin: "", functionText: "Difficulty sitting (AMA 237)", category: "Generalized" },
+  { point: "SI-6", pinyin: "", functionText: "Difficulty rising (AMA 237)", category: "Generalized" },
+  { point: "SI-6", pinyin: "", functionText: "Numbness in the shoulder (AMA 237)", category: "Shoulder" },
+  { point: "SI-6", pinyin: "", functionText: "Numbness in the arm (AMA 237)", category: "Generalized" },
+  { point: "SI-6", pinyin: "", functionText: "Contraction of the sinews (AMA 237)", category: "Generalized" },
+  { point: "SI-6", pinyin: "", functionText: "Painful obstruction of the sinews (AMA 237)", category: "Generalized" },
+  { point: "SI-6", pinyin: "", functionText: "Painful obstruction of the foot with inability to flex and extend (AMA 237)", category: "Foot" },
+  { point: "SI-7", pinyin: "", functionText: "Neck rigidity (CAM 168) (??? 238)", category: "Neck" },
+  { point: "SI-7", pinyin: "", functionText: "The five taxations (AMA 238)", category: "Generalized" },
+  { point: "SI-7", pinyin: "", functionText: "Feebleness in the four limbs (AMA 238)", category: "Generalized" },
+  { point: "SI-7", pinyin: "", functionText: "Slackness in the joints (AMA 238)", category: "Generalized" },
+  { point: "SI-7", pinyin: "", functionText: "Contraction of the elbow (AMA 238)", category: "Elbow" },
+  { point: "SI-7", pinyin: "", functionText: "Inability to move the elbow (AMA 238)", category: "Elbow" },
+  { point: "SI-7", pinyin: "", functionText: "Severe pain in all the fingers (AMA 238)", category: "Finger" },
+  { point: "SI-7", pinyin: "", functionText: "Inability to grip firmly (AMA 238)", category: "Finger" },
+  { point: "SI-7", pinyin: "", functionText: "Inability to make a fist (AMA 238)", category: "Finger" },
+  { point: "SI-8", pinyin: "", functionText: "Pain the nape (back) of the neck (CAM 169)", category: "Neck" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the neck (AMA 239)", category: "Neck" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the neck radiating to the elbow (AMA 239)", category: "Neck" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the scapula (AMA 239)", category: "Shoulder" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the posterio-lateral aspect of the shoulder (AMA 239)", category: "Shoulder" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the upper arm (AMA 239)", category: "Generalized" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the axilla (AMA 239)", category: "Generalized" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the elbow (CAM 169) (AMA 239)", category: "Elbow" },
+  { point: "SI-8", pinyin: "", functionText: "Swelling of the elbow (AMA 239)", category: "Elbow" },
+  { point: "SI-8", pinyin: "", functionText: "Inability to raise the four limbs (AMA 239)", category: "Generalized" },
+  { point: "SI-8", pinyin: "", functionText: "Lumbar pain radiating to the hypogastrium (AMA 239)", category: "Back" },
+  { point: "SI-8", pinyin: "", functionText: "Pain in the lower abdomen (AMA 239)", category: "Generalized" },
+  { point: "SI-9", pinyin: "", functionText: "Pain in the supraclavicular fossa (AMA 240)", category: "Shoulder" },
+  { point: "SI-9", pinyin: "", functionText: "Wind painful obstruction (AMA 240)", category: "Generalized" },
+  { point: "SI-9", pinyin: "", functionText: "Pain in the shoulder (AMA 240)", category: "Shoulder" },
+  { point: "SI-9", pinyin: "", functionText: "Pain in the upper arm (AMA 240)", category: "Generalized" },
+  { point: "SI-9", pinyin: "", functionText: "Inability to raise the hand die to numbness (AMA 240)", category: "Hand" },
+  { point: "SI-9", pinyin: "", functionText: "Inability to raise the foot due to numbness (A?? 240)", category: "Foot" },
+  { point: "SI-10", pinyin: "", functionText: "Swelling of the shoulder (CAM 170) (A?? 241)", category: "Shoulder" },
+  { point: "SI-10", pinyin: "", functionText: "Pain in the shoulder that radiates to the scapula (AMA 241)", category: "Shoulder" },
+  { point: "SI-10", pinyin: "", functionText: "Pain (ache) of the shoulder (CAM 170) (AMA 241)", category: "Shoulder" },
+  { point: "SI-10", pinyin: "", functionText: "Pain (aching) of the arm (CAM 170) (AMA 241)", category: "Generalized" },
+  { point: "SI-10", pinyin: "", functionText: "Weakness of the shoulder (CAM 170)", category: "Shoulder" },
+  { point: "SI-10", pinyin: "", functionText: "Weakness of the arm (CAM 170) (AMA 241)", category: "Generalized" },
+  { point: "SI-10", pinyin: "", functionText: "Inability to raise the shoulder (AMA 241)", category: "Shoulder" },
+  { point: "SI-11", pinyin: "", functionText: "Unbinds the lateral-costal region (AMA 242)", category: "Generalized" },
+  { point: "SI-11", pinyin: "", functionText: "Heaviness in the shoulder (AMA 242)", category: "Shoulder" },
+  { point: "SI-11", pinyin: "", functionText: "Pain in the shoulder (AMA 242)", category: "Shoulder" },
+  { point: "SI-11", pinyin: "", functionText: "Pain with inability to raise the elbow (AMA 242)", category: "Elbow" },
+  { point: "SI-11", pinyin: "", functionText: "Pain with inability to raise the arm (AMA 242)", category: "Generalized" },
+  { point: "SI-11", pinyin: "", functionText: "Pain in the scapular region (CAM 171) (AMA 242)", category: "Shoulder" },
+  { point: "SI-12", pinyin: "", functionText: "Pain in the scapular region (CAM 171) (AMA 242)", category: "Shoulder" },
+  { point: "SI-12", pinyin: "", functionText: "Numbness in the upper extremities (CAM 171) (AMA 242)", category: "Generalized" },
+  { point: "SI-12", pinyin: "", functionText: "Pain (aching) in the upper extremities (CAM 171) (AMA 242)", category: "Generalized" },
+  { point: "SI-12", pinyin: "", functionText: "Motor impairment of the shoulder (CAM 171) (AMA 242)", category: "Shoulder" },
+  { point: "SI-12", pinyin: "", functionText: "Inability to raise the arm at the shoulder (AMA 242)", category: "Shoulder" },
+  { point: "SI-12", pinyin: "", functionText: "Stiffness in the neck (AMA 242)", category: "Neck" },
+  { point: "SI-12", pinyin: "", functionText: "Inability to turn the head (AMA 242)", category: "Head" },
+  { point: "SI-13", pinyin: "", functionText: "General painful obstruction (AMA 243)", category: "Generalized" },
+  { point: "SI-13", pinyin: "", functionText: "Pain in the scapular region (CAM 171) (AMA 243)", category: "Shoulder" },
+  { point: "SI-13", pinyin: "", functionText: "Stiffness of the scapular region (CAM 171) (AMA 243)", category: "Shoulder" },
+  { point: "SI-13", pinyin: "", functionText: "Hot painful obstruction of the shoulder with contraction (AMA 243)", category: "Shoulder" },
+  { point: "SI-13", pinyin: "", functionText: "Oppressive sensation of the shoulder (AMA 243)", category: "Shoulder" },
+  { point: "SI-14", pinyin: "", functionText: "General painful obstruction (AMA 244)", category: "Generalized" },
+  { point: "SI-14", pinyin: "", functionText: "Pain (aching) in the shoulder (CAM 171) (AMA 244)", category: "Shoulder" },
+  { point: "SI-14", pinyin: "", functionText: "Pain in the scapula (AMA 244)", category: "Shoulder" },
+  { point: "SI-14", pinyin: "", functionText: "Scapular pain with cold sensation down to the elbow (AMA 244)", category: "Shoulder" },
+  { point: "SI-14", pinyin: "", functionText: "Aching in the back (CAM 171)", category: "Back" },
+  { point: "SI-14", pinyin: "", functionText: "Rigidity in the neck (CAM 171) (AMA 244)", category: "Neck" },
+  { point: "SI-14", pinyin: "", functionText: "Inability to turn the head (AM?? 244)", category: "Head" },
+  { point: "SI-15", pinyin: "", functionText: "Pain in the shoulder (CAM 172) (AMA 244)", category: "Shoulder" },
+  { point: "SI-15", pinyin: "", functionText: "Pain in the scapula (AMA 244)", category: "Shoulder" },
+  { point: "SI-16", pinyin: "", functionText: "Lockjaw (AMA 245)", category: "Head" },
+  { point: "SI-16", pinyin: "", functionText: "Stiffness in the neck (CAM 172) (??? 245)", category: "Neck" },
+  { point: "SI-16", pinyin: "", functionText: "Inability to turn the head (AMA 245)", category: "Head" },
+  { point: "SI-16", pinyin: "", functionText: "Pain in the neck (CAM 172) (AMA 245)", category: "Neck" },
+  { point: "SI-16", pinyin: "", functionText: "Shoulder pain (AMA 245)", category: "Shoulder" },
+  { point: "SI-17", pinyin: "", functionText: "Pain in the neck (AMA 246)", category: "Neck" },
+  { point: "SI-17", pinyin: "", functionText: "Pain in the shoulder (AMA 246)", category: "Shoulder" },
+  { point: "SI-17", pinyin: "", functionText: "Pain in the shoulder with the inability to raise the arm (A??? 246)", category: "Shoulder" },
+  { point: "SI-19", pinyin: "", functionText: "Motor impairment of the mandibular joint (CAM 173)", category: "Generalized" },
+  { point: "BL-2", pinyin: "", functionText: "Pain of the neck (AMA 257)", category: "Neck" },
+  { point: "BL-2", pinyin: "", functionText: "Stiffness of the neck (AMA 257)", category: "Neck" },
+  { point: "BL-7", pinyin: "", functionText: "Stiff neck (AMA 261)", category: "Neck" },
+  { point: "BL-7", pinyin: "", functionText: "Loss of sense of smell (AMA 261)", category: "Generalized" },
+  { point: "BL-7", pinyin: "", functionText: "Collapse on sudden standing (AMA 261)", category: "Generalized" },
+  { point: "BL-7", pinyin: "", functionText: "Loss of consciousness (AMA 261)", category: "Generalized" },
+  { point: "BL-10", pinyin: "", functionText: "Stiffness of the neck with inability to turn the head (AMA 263)", category: "Neck" },
+  { point: "BL-10", pinyin: "", functionText: "Pain of the shoulder (AMA 263)", category: "Shoulder" },
+  { point: "BL-10", pinyin: "", functionText: "Pain of the back (AMA 263)", category: "Back" },
+  { point: "BL-11", pinyin: "", functionText: "Bone diseases (AMA 264)", category: "Generalized" },
+  { point: "BL-11", pinyin: "", functionText: "Rigidity of the nape of the neck (AMA 264)", category: "Neck" },
+  { point: "BL-11", pinyin: "", functionText: "Rigidity of the spine (AMA 264)", category: "Back" },
+  { point: "BL-11", pinyin: "", functionText: "Soreness of the back (AMA 264)", category: "Back" },
+  { point: "BL-11", pinyin: "", functionText: "Soreness of the scapula (AMA 264)", category: "Shoulder" },
+  { point: "BL-11", pinyin: "", functionText: "Pain of the back (AMA 264)", category: "Back" },
+  { point: "BL-11", pinyin: "", functionText: "Pain of the scapulalumbar pain (AMA 264)", category: "Shoulder" },
+  { point: "BL-11", pinyin: "", functionText: "Tetany (AMA 264)", category: "Generalized" },
+  { point: "BL-11", pinyin: "", functionText: "Stiffness of the knee (AMA 264)", category: "Knee" },
+  { point: "BL-11", pinyin: "", functionText: "Pain of the knee (AMA 264)", category: "Knee" },
+  { point: "BL-11", pinyin: "", functionText: "Inability to stand for long (AM?? 264)", category: "Generalized" },
+  { point: "BL-12", pinyin: "", functionText: "Lumbar pain (AMA 266)", category: "Back" },
+  { point: "BL-12", pinyin: "", functionText: "Stiff neck (AMA 266)", category: "Neck" },
+  { point: "BL-12", pinyin: "", functionText: "Shoulder pain (AMA 266)", category: "Shoulder" },
+  { point: "BL-13", pinyin: "", functionText: "Pain of the upper back (AMA 267)", category: "Back" },
+  { point: "BL-13", pinyin: "", functionText: "Pain of the shoulder (AMA 267)", category: "Shoulder" },
+  { point: "BL-13", pinyin: "", functionText: "Crooked spine (AMA 267)", category: "Back" },
+  { point: "BL-13", pinyin: "", functionText: "Lumbar pain (AMA 267)", category: "Back" },
+  { point: "BL-13", pinyin: "", functionText: "Lumbar stiffness (AMA 267)", category: "Back" },
+  { point: "BL-17", pinyin: "", functionText: "Steaming bone disorder (AMA 273)", category: "Generalized" },
+  { point: "BL-17", pinyin: "", functionText: "Painful obstruction of the whole body (AMA 273)", category: "Generalized" },
+  { point: "BL-17", pinyin: "", functionText: "Pain of the whole body (AMA 273)", category: "Generalized" },
+  { point: "BL-17", pinyin: "", functionText: "Pain of the skin (AMA 273)", category: "Generalized" },
+  { point: "BL-17", pinyin: "", functionText: "Pain of the flesh (AMA 273)", category: "Generalized" },
+  { point: "BL-17", pinyin: "", functionText: "Pain of the bones (AMA 273)", category: "Generalized" },
+  { point: "BL-17", pinyin: "", functionText: "Weariness of the four limbs (AMA 273)", category: "Generalized" },
+  { point: "BL-17", pinyin: "", functionText: "Back pain (AMA 273)", category: "Back" },
+  { point: "BL-17", pinyin: "", functionText: "Rigidity of the spine (AMA 273)", category: "Back" },
+  { point: "BL-18", pinyin: "", functionText: "Pain of the lateral costal region (AMA 275)", category: "Generalized" },
+  { point: "BL-18", pinyin: "", functionText: "Rigidity of the neck (AMA 275)", category: "Neck" },
+  { point: "BL-18", pinyin: "", functionText: "Rigidity of the spine (AMA 275)", category: "Back" },
+  { point: "BL-18", pinyin: "", functionText: "Pain of the spine (AMA 275)", category: "Back" },
+  { point: "BL-18", pinyin: "", functionText: "Lumbar pain (AMA 275)", category: "Back" },
+  { point: "BL-18", pinyin: "", functionText: "Pain of the neck (AMA 275)", category: "Neck" },
+  { point: "BL-18", pinyin: "", functionText: "Pain of the shoulders (AMA 275)", category: "Shoulder" },
+  { point: "BL-18", pinyin: "", functionText: "Lockjaw (AMA 275)", category: "Head" },
+  { point: "BL-18", pinyin: "", functionText: "Opisthotonos (AMA 275)", category: "Generalized" },
+  { point: "BL-18", pinyin: "", functionText: "Pain of the sinews (AMA 275)", category: "Generalized" },
+  { point: "BL-18", pinyin: "", functionText: "Tetany (AMA 275)", category: "Generalized" },
+  { point: "BL-19", pinyin: "", functionText: "Distention of the lateral costal region with inability to turn (AMA 277)", category: "Generalized" },
+  { point: "BL-19", pinyin: "", functionText: "Pain of the chest with inability to turn (AMA 277)", category: "Generalized" },
+  { point: "BL-19", pinyin: "", functionText: "Pain of the lateral costal region with inability to turn (AMA 277)", category: "Generalized" },
+  { point: "BL-20", pinyin: "", functionText: "Heaviness of the body with no desire to move (AMA 279)", category: "Generalized" },
+  { point: "BL-20", pinyin: "", functionText: "Lumbar pain (AMA 279)", category: "Back" },
+  { point: "BL-20", pinyin: "", functionText: "Pain of the shoulder (AMA 279)", category: "Shoulder" },
+  { point: "BL-20", pinyin: "", functionText: "Pain of the back (AMA 279)", category: "Back" },
+  { point: "BL-20", pinyin: "", functionText: "Skin pain (AMA 279)", category: "Generalized" },
+  { point: "BL-21", pinyin: "", functionText: "Contraction of the back (AMA 281)", category: "Back" },
+  { point: "BL-21", pinyin: "", functionText: "Pain of the back (AMA 281)", category: "Back" },
+  { point: "BL-22", pinyin: "", functionText: "Stiffness of the shoulder (AMA 282)", category: "Shoulder" },
+  { point: "BL-22", pinyin: "", functionText: "Stiffness of the back (AMA 282)", category: "Back" },
+  { point: "BL-22", pinyin: "", functionText: "Inflexibility of the shoulder (AMA 282)", category: "Shoulder" },
+  { point: "BL-22", pinyin: "", functionText: "Inflexibility of the back (AMA 282)", category: "Back" },
+  { point: "BL-23", pinyin: "", functionText: "Pain of the lateral costal region (AMA 283)", category: "Generalized" },
+  { point: "BL-23", pinyin: "", functionText: "The five taxations (AMA 283)", category: "Generalized" },
+  { point: "BL-23", pinyin: "", functionText: "The seven injuries (AMA 283)", category: "Generalized" },
+  { point: "BL-23", pinyin: "", functionText: "Pain of the lumbar region (AMA 283)", category: "Back" },
+  { point: "BL-23", pinyin: "", functionText: "Pain of the knees (AMA 283)", category: "Knee" },
+  { point: "BL-23", pinyin: "", functionText: "Soreness of the lumbar region (AMA 283)", category: "Back" },
+  { point: "BL-23", pinyin: "", functionText: "Soreness of the knees (AMA 283)", category: "Knee" },
+  { point: "BL-23", pinyin: "", functionText: "Icy-cold sensation of the lumbar region (AMA 283)", category: "Back" },
+  { point: "BL-24", pinyin: "", functionText: "Lumbar pain (AMA 286)", category: "Back" },
+  { point: "BL-24", pinyin: "", functionText: "Lumbar stiffness (AMA 286)", category: "Back" },
+  { point: "BL-24", pinyin: "", functionText: "Painful obstruction (AMA 286)", category: "Generalized" },
+  { point: "BL-24", pinyin: "", functionText: "Pain of the lower limb (AMA 286)", category: "Legs" },
+  { point: "BL-25", pinyin: "", functionText: "Strengthens the lumbar region (AMA 287)", category: "Back" },
+  { point: "BL-25", pinyin: "", functionText: "Strengthens the legs (AMA 287)", category: "Legs" },
+  { point: "BL-25", pinyin: "", functionText: "Stiffness of the lumbar spine (AMA 287)", category: "Back" },
+  { point: "BL-25", pinyin: "", functionText: "Rigidity of the lumbar spine (AMA 287)", category: "Back" },
+  { point: "BL-25", pinyin: "", functionText: "Pain of the lower limbs (AMA 287)", category: "Legs" },
+  { point: "BL-25", pinyin: "", functionText: "Painful obstruction of the lower limbs (AMA 287)", category: "Legs" },
+  { point: "BL-25", pinyin: "", functionText: "Atrophy disorder (AMA 287)", category: "Generalized" },
+  { point: "BL-26", pinyin: "", functionText: "Lumbar pain (AMA 288)", category: "Back" },
+  { point: "BL-26", pinyin: "", functionText: "Wind-taxation lumber pain (A?? 288)", category: "Back" },
+  { point: "BL-28", pinyin: "", functionText: "Stiffness of the sacrum (AMA 290)", category: "Hips" },
+  { point: "BL-28", pinyin: "", functionText: "Stiffness of the coccyx (AMA 290)", category: "Hips" },
+  { point: "BL-28", pinyin: "", functionText: "Pain of the sacrum (AMA 290)", category: "Hips" },
+  { point: "BL-28", pinyin: "", functionText: "Pain of the coc??? (??? 290)", category: "Hips" },
+  { point: "BL-28", pinyin: "", functionText: "Stiffness of the lumbar spine that radiates to the hypogastrium (AMA 290)", category: "Back" },
+  { point: "BL-28", pinyin: "", functionText: "Pain of the lumbar spine that radiates to the hypogastrium (AMA 290)", category: "Back" },
+  { point: "BL-28", pinyin: "", functionText: "Difficulty in bending (AMA 290)", category: "Generalized" },
+  { point: "BL-28", pinyin: "", functionText: "Wind-taxation lumbar stiffness (AMA 290)", category: "Back" },
+  { point: "BL-28", pinyin: "", functionText: "Wind-taxation pain (AMA 290)", category: "Generalized" },
+  { point: "BL-28", pinyin: "", functionText: "Stiffness of the lower spine (AMA 290)", category: "Back" },
+  { point: "BL-28", pinyin: "", functionText: "Stiffness of the buttock (AMA 290)", category: "Hips" },
+  { point: "BL-28", pinyin: "", functionText: "Pain of the lower spine (AMA 290)", category: "Back" },
+  { point: "BL-28", pinyin: "", functionText: "Pain of the buttock (AMA 290)", category: "Hips" },
+  { point: "BL-28", pinyin: "", functionText: "Inability to sit for long (AMA 290)", category: "Generalized" },
+  { point: "BL-28", pinyin: "", functionText: "Weakness of the leg (AMA 290)", category: "Legs" },
+  { point: "BL-28", pinyin: "", functionText: "Weakness of the knee (AMA 290)", category: "Knee" },
+  { point: "BL-28", pinyin: "", functionText: "Cold of the lower leg (AMA 290)", category: "Legs" },
+  { point: "BL-28", pinyin: "", functionText: "Contraction of the lower leg (AMA 290)", category: "Legs" },
+  { point: "BL-28", pinyin: "", functionText: "Numbness of the leg (AMA 290)", category: "Legs" },
+  { point: "BL-28", pinyin: "", functionText: "Atrophy disorder (AMA 290)", category: "Generalized" },
+  { point: "BL-28", pinyin: "", functionText: "Heaviness of the leg (AMA 290)", category: "Legs" },
+  { point: "BL-28", pinyin: "", functionText: "Sciatica (AMA 290)", category: "Legs" },
+  { point: "BL-29", pinyin: "", functionText: "Stiffness of the lumbar spine (AMA 291)", category: "Back" },
+  { point: "BL-29", pinyin: "", functionText: "Pain of the lumbar spine (AMA 291)", category: "Back" },
+  { point: "BL-29", pinyin: "", functionText: "Inability to turn the spine (AMA 291)", category: "Back" },
+  { point: "BL-29", pinyin: "", functionText: "Pain of the lateral costal region (AMA 291)", category: "Generalized" },
+  { point: "BL-30", pinyin: "", functionText: "Pain of the lumbar spine (AMA 292)", category: "Back" },
+  { point: "BL-30", pinyin: "", functionText: "Pain of the sacrum (AMA 292)", category: "Hips" },
+  { point: "BL-30", pinyin: "", functionText: "Lumbar pain due to cold (AMA 292)", category: "Back" },
+  { point: "BL-30", pinyin: "", functionText: "Pain of the lumbar region (AMA 292)", category: "Back" },
+  { point: "BL-30", pinyin: "", functionText: "Pain of the hip (AMA 292)", category: "Hips" },
+  { point: "BL-30", pinyin: "", functionText: "Pain of the coccyx (AMA 292)", category: "Hips" },
+  { point: "BL-30", pinyin: "", functionText: "Difficulty in sitting (AMA 292)", category: "Generalized" },
+  { point: "BL-30", pinyin: "", functionText: "Difficulty in standing (AMA 292)", category: "Generalized" },
+  { point: "BL-30", pinyin: "", functionText: "Debility of the leg (AMA 292)", category: "Legs" },
+  { point: "BL-30", pinyin: "", functionText: "Debility of the knee (AMA 292)", category: "Knee" },
+  { point: "BL-30", pinyin: "", functionText: "Contracted sinews associated with painful obstruction (AMA 292)", category: "Generalized" },
+  { point: "BL-31", pinyin: "", functionText: "Lumbar pain (AMA 293)", category: "Back" },
+  { point: "BL-31", pinyin: "", functionText: "Cold of the back (AMA 293)", category: "Back" },
+  { point: "BL-31", pinyin: "", functionText: "Cold of the knees (AMA 293)", category: "Knee" },
+  { point: "BL-31", pinyin: "", functionText: "Pain of the back (AMA 293)", category: "Back" },
+  { point: "BL-31", pinyin: "", functionText: "Pain of the knees (AMA 293)", category: "Knee" },
+  { point: "BL-32", pinyin: "", functionText: "Lumbar pain (AMA 294)", category: "Back" },
+  { point: "BL-32", pinyin: "", functionText: "Sacral pain (A?? 294)", category: "Hips" },
+  { point: "BL-32", pinyin: "", functionText: "Numbness of the lumbar region extending down to the feet (AMA 294)", category: "Back" },
+  { point: "BL-32", pinyin: "", functionText: "Cold sensation of the lumbar region (AMA 294)", category: "Back" },
+  { point: "BL-32", pinyin: "", functionText: "Lumbar pain radiating to the genitals (AMA 294)", category: "Back" },
+  { point: "BL-32", pinyin: "", functionText: "Sciatica (AMA 294)", category: "Legs" },
+  { point: "BL-32", pinyin: "", functionText: "Pain of the lower limb (AMA 294)", category: "Legs" },
+  { point: "BL-32", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 294)", category: "Legs" },
+  { point: "BL-33", pinyin: "", functionText: "Lumbar pain (AMA 295)", category: "Back" },
+  { point: "BL-33", pinyin: "", functionText: "Pain of the sacrum (AMA 295)", category: "Hips" },
+  { point: "BL-33", pinyin: "", functionText: "Pain of the co???? (??? 295)", category: "Hips" },
+  { point: "BL-33", pinyin: "", functionText: "Cold of the sacrum (AMA 295)", category: "Hips" },
+  { point: "BL-33", pinyin: "", functionText: "Cold of the coccyx (AMA 295)", category: "Hips" },
+  { point: "BL-33", pinyin: "", functionText: "Cold sensation of the buttocks (AMA 295)", category: "Hips" },
+  { point: "BL-33", pinyin: "", functionText: "Atrophy disorder (AMA 295)", category: "Generalized" },
+  { point: "BL-33", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 295)", category: "Legs" },
+  { point: "BL-33", pinyin: "", functionText: "The five taxations (AMA 295)", category: "Generalized" },
+  { point: "BL-33", pinyin: "", functionText: "The seven injuries (AMA 295)", category: "Generalized" },
+  { point: "BL-34", pinyin: "", functionText: "Pain radiating to the lower abdomen (AMA 295)", category: "Generalized" },
+  { point: "BL-34", pinyin: "", functionText: "Pain of the sacrum (AMA 295)", category: "Hips" },
+  { point: "BL-34", pinyin: "", functionText: "Pain of the co???? (AMA 295)", category: "Hips" },
+  { point: "BL-34", pinyin: "", functionText: "Lumbar pain (AMA 295)", category: "Back" },
+  { point: "BL-34", pinyin: "", functionText: "Lumbar pain radiating to the testicles (AMA 295)", category: "Back" },
+  { point: "BL-35", pinyin: "", functionText: "Pain of the coccyx (AMA 296)", category: "Hips" },
+  { point: "BL-35", pinyin: "", functionText: "Pain of the lumbar region (AMA 296)", category: "Back" },
+  { point: "BL-35", pinyin: "", functionText: "Pain of the leg (AMA 296)", category: "Legs" },
+  { point: "BL-36", pinyin: "", functionText: "Lumbar pain (AMA 296)", category: "Back" },
+  { point: "BL-36", pinyin: "", functionText: "Pain of the sacrum (AMA 296)", category: "Hips" },
+  { point: "BL-36", pinyin: "", functionText: "Pain of the co???? (AMA 296)", category: "Hips" },
+  { point: "BL-36", pinyin: "", functionText: "Pain of the buttock (AMA 296)", category: "Hips" },
+  { point: "BL-36", pinyin: "", functionText: "Sciatica (AMA 296)", category: "Legs" },
+  { point: "BL-36", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 296)", category: "Legs" },
+  { point: "BL-36", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 296)", category: "Legs" },
+  { point: "BL-37", pinyin: "", functionText: "Pain of the lumbar spine (AMA 297)", category: "Back" },
+  { point: "BL-37", pinyin: "", functionText: "Rigidity of the lumbar spine (A?? 297)", category: "Back" },
+  { point: "BL-37", pinyin: "", functionText: "Sciatica (AMA 297)", category: "Legs" },
+  { point: "BL-37", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 297)", category: "Legs" },
+  { point: "BL-37", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 297)", category: "Legs" },
+  { point: "BL-37", pinyin: "", functionText: "Pain of the thigh (AMA 297)", category: "Legs" },
+  { point: "BL-37", pinyin: "", functionText: "Swelling of the lateral thigh (AMA 297)", category: "Legs" },
+  { point: "BL-38", pinyin: "", functionText: "Numbness of the buttock (AMA 298)", category: "Hips" },
+  { point: "BL-38", pinyin: "", functionText: "Contraction of the outer thigh (AMA 298)", category: "Legs" },
+  { point: "BL-38", pinyin: "", functionText: "Pain of the outer thigh (AMA 298)", category: "Legs" },
+  { point: "BL-40", pinyin: "", functionText: "Pain of the lumbar spine (AMA 300)", category: "Back" },
+  { point: "BL-40", pinyin: "", functionText: "Stiffness of the lumbar spine (AMA 300)", category: "Back" },
+  { point: "BL-40", pinyin: "", functionText: "Heaviness of the lumbar region (AMA 300)", category: "Back" },
+  { point: "BL-40", pinyin: "", functionText: "Heaviness of the buttock (AMA 300)", category: "Hips" },
+  { point: "BL-40", pinyin: "", functionText: "Cold sensation of the sacrum (AMA 300)", category: "Hips" },
+  { point: "BL-40", pinyin: "", functionText: "Cold sensation of the coccyx (AMA 300)", category: "Hips" },
+  { point: "BL-40", pinyin: "", functionText: "Cold sensation of the thigh (AMA 300)", category: "Legs" },
+  { point: "BL-40", pinyin: "", functionText: "Knee pain extending to the big toe (AMA 300)", category: "Knee" },
+  { point: "BL-40", pinyin: "", functionText: "Difficulty in flexing the hip joints (AMA 300)", category: "Hips" },
+  { point: "BL-40", pinyin: "", functionText: "Difficulty in flexing the knee joints (AMA 300)", category: "Knee" },
+  { point: "BL-40", pinyin: "", functionText: "Difficulty in extending the hip joints (AMA 300)", category: "Hips" },
+  { point: "BL-40", pinyin: "", functionText: "Difficulty in extending the knee joints (AMA 300)", category: "Knee" },
+  { point: "BL-40", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 300)", category: "Legs" },
+  { point: "BL-40", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 300)", category: "Legs" },
+  { point: "BL-40", pinyin: "", functionText: "Wind painful obstruction (AMA 300)", category: "Generalized" },
+  { point: "BL-40", pinyin: "", functionText: "Injury by cold with heat of the four limbs (AMA 300)", category: "Generalized" },
+  { point: "BL-41", pinyin: "", functionText: "Contraction of the shoulder (AMA 302)", category: "Shoulder" },
+  { point: "BL-41", pinyin: "", functionText: "Contraction of the scapula (AMA 302)", category: "Shoulder" },
+  { point: "BL-41", pinyin: "", functionText: "Contraction of the back (AMA 302)", category: "Back" },
+  { point: "BL-41", pinyin: "", functionText: "Pain of the neck (AMA 302)", category: "Neck" },
+  { point: "BL-41", pinyin: "", functionText: "Stiffness of the neck (AMA 302)", category: "Neck" },
+  { point: "BL-41", pinyin: "", functionText: "Back pain radiating to the head (AMA 302)", category: "Back" },
+  { point: "BL-41", pinyin: "", functionText: "Numbness of the elbow (AMA 302)", category: "Elbow" },
+  { point: "BL-41", pinyin: "", functionText: "Numbness of the upper arm (AMA 302)", category: "Generalized" },
+  { point: "BL-41", pinyin: "", functionText: "Wind-cold lodged in the interstices (AMA 302)", category: "Generalized" },
+  { point: "BL-42", pinyin: "", functionText: "Pain of the shoulder (AMA 302)", category: "Shoulder" },
+  { point: "BL-42", pinyin: "", functionText: "Pain of the scapula (AMA 302)", category: "Shoulder" },
+  { point: "BL-42", pinyin: "", functionText: "Pain of the back (AMA 302)", category: "Back" },
+  { point: "BL-42", pinyin: "", functionText: "Pain of the chest (AMA 302)", category: "Generalized" },
+  { point: "BL-42", pinyin: "", functionText: "Stiff neck (AMA 302)", category: "Neck" },
+  { point: "BL-43", pinyin: "", functionText: "Steaming bone disorder (AMA 303)", category: "Generalized" },
+  { point: "BL-43", pinyin: "", functionText: "Pain of the back (AMA 303)", category: "Back" },
+  { point: "BL-43", pinyin: "", functionText: "Pain of the shoulder (AMA 303)", category: "Shoulder" },
+  { point: "BL-44", pinyin: "", functionText: "Stiffness of the back (A?? 305)", category: "Back" },
+  { point: "BL-44", pinyin: "", functionText: "Pain of the back (AMA 305)", category: "Back" },
+  { point: "BL-44", pinyin: "", functionText: "Pain of the shoulder that radiates to the chest (AMA 305)", category: "Shoulder" },
+  { point: "BL-44", pinyin: "", functionText: "Pain of the back that radiates to the chest (AMA 305)", category: "Back" },
+  { point: "BL-45", pinyin: "", functionText: "Pain of the shoulder (AMA 305)", category: "Shoulder" },
+  { point: "BL-45", pinyin: "", functionText: "Pain of the scapula (AMA 305)", category: "Shoulder" },
+  { point: "BL-45", pinyin: "", functionText: "Pain of the back (AMA 305)", category: "Back" },
+  { point: "BL-45", pinyin: "", functionText: "Chest pain that radiates to the lumbar region (AMA 305)", category: "Back" },
+  { point: "BL-45", pinyin: "", functionText: "Pain of the lateral costal region accompanied by distention hypogastrium (AMA 305)", category: "Generalized" },
+  { point: "BL-45", pinyin: "", functionText: "Pain of the lateral costal region accompanied by pain of the hypogastrium (AMA 305)", category: "Generalized" },
+  { point: "BL-45", pinyin: "", functionText: "Pain of the lateral costal region radiating ot the Heart (AMA 305)", category: "Generalized" },
+  { point: "BL-45", pinyin: "", functionText: "Pain of the lateral costal region radiating to the Lung (AMA 305)", category: "Generalized" },
+  { point: "BL-45", pinyin: "", functionText: "Contraction of the axilla (AMA 305)", category: "Generalized" },
+  { point: "BL-46", pinyin: "", functionText: "Stiffness of the spine (A?? 306)", category: "Back" },
+  { point: "BL-46", pinyin: "", functionText: "Pain of the spine (AMA 306)", category: "Back" },
+  { point: "BL-46", pinyin: "", functionText: "Difficulty in bending the spine (AMA 306)", category: "Back" },
+  { point: "BL-46", pinyin: "", functionText: "Difficulty in extending the spine (AMA 306)", category: "Back" },
+  { point: "BL-46", pinyin: "", functionText: "Back pain with aversion to cold (AMA 306)", category: "Back" },
+  { point: "BL-46", pinyin: "", functionText: "Pain of the body (AMA 306)", category: "Generalized" },
+  { point: "BL-46", pinyin: "", functionText: "Stiffness of the joints (AMA 306)", category: "Generalized" },
+  { point: "BL-47", pinyin: "", functionText: "Contraction of the sinews (AMA 307)", category: "Generalized" },
+  { point: "BL-47", pinyin: "", functionText: "Bone pain of the whole body (AMA 307)", category: "Generalized" },
+  { point: "BL-47", pinyin: "", functionText: "Joint pain of the whole body (AMA 307)", category: "Generalized" },
+  { point: "BL-49", pinyin: "", functionText: "Pain of the lateral costal region (AMA 308)", category: "Generalized" },
+  { point: "BL-49", pinyin: "", functionText: "Back pain (AMA 308)", category: "Back" },
+  { point: "BL-50", pinyin: "", functionText: "Back pain (AMA 309)", category: "Back" },
+  { point: "BL-52", pinyin: "", functionText: "Lumbar pain (AMA 310)", category: "Back" },
+  { point: "BL-52", pinyin: "", functionText: "Lumbar stiffness (AMA 310)", category: "Back" },
+  { point: "BL-52", pinyin: "", functionText: "Back pain (A?? 310)", category: "Back" },
+  { point: "BL-54", pinyin: "", functionText: "Pain of the lumbar region (AMA 312)", category: "Back" },
+  { point: "BL-54", pinyin: "", functionText: "Pain of the sacrum (AMA 312)", category: "Hips" },
+  { point: "BL-54", pinyin: "", functionText: "Coldness of the lumbar region (AMA 312)", category: "Back" },
+  { point: "BL-54", pinyin: "", functionText: "Coldness of the sacrum (AMA 312)", category: "Hips" },
+  { point: "BL-54", pinyin: "", functionText: "Kidney deficiency lumbar pain (AMA 312)", category: "Back" },
+  { point: "BL-54", pinyin: "", functionText: "Pain of the buttock (AMA 312)", category: "Hips" },
+  { point: "BL-54", pinyin: "", functionText: "Sciatica (AMA 312)", category: "Legs" },
+  { point: "BL-54", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 312)", category: "Legs" },
+  { point: "BL-54", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 312)", category: "Legs" },
+  { point: "BL-55", pinyin: "", functionText: "Lumbar pain radiating to the abdomen (AMA 313)", category: "Back" },
+  { point: "BL-55", pinyin: "", functionText: "Heaviness of the knees (AMA 313)", category: "Knee" },
+  { point: "BL-55", pinyin: "", functionText: "Difficulty in walking (AMA 313)", category: "Generalized" },
+  { point: "BL-56", pinyin: "", functionText: "Relaxes the sinews (AMA 313)", category: "Generalized" },
+  { point: "BL-56", pinyin: "", functionText: "Contraction of the lumbar spine (AMA 314)", category: "Back" },
+  { point: "BL-56", pinyin: "", functionText: "Pain of the lumbar spine (AM?? 314)", category: "Back" },
+  { point: "BL-56", pinyin: "", functionText: "Painful obstruction of the lower leg (AMA 314)", category: "Legs" },
+  { point: "BL-56", pinyin: "", functionText: "Shivering with inability to stand for long (AMA 314)", category: "Generalized" },
+  { point: "BL-56", pinyin: "", functionText: "Heat sensation in the soles with inability to stand for long (A?? 314)", category: "Foot" },
+  { point: "BL-56", pinyin: "", functionText: "Pain of the foot (AMA 314)", category: "Foot" },
+  { point: "BL-56", pinyin: "", functionText: "Pain of the heel (AMA 314)", category: "Foot" },
+  { point: "BL-56", pinyin: "", functionText: "Contraction of the foot (AMA 314)", category: "Foot" },
+  { point: "BL-56", pinyin: "", functionText: "Contraction of the heel (AMA 314)", category: "Foot" },
+  { point: "BL-56", pinyin: "", functionText: "Swelling of the axilla (AMA 314)", category: "Generalized" },
+  { point: "BL-57", pinyin: "", functionText: "Pain of the lumbar region (AMA 315)", category: "Back" },
+  { point: "BL-57", pinyin: "", functionText: "Pain of the sciatica (AMA 315)", category: "Legs" },
+  { point: "BL-57", pinyin: "", functionText: "Stiffness of the lumbar region (AMA 315)", category: "Back" },
+  { point: "BL-57", pinyin: "", functionText: "Stiffness of the sciatica (AMA 315)", category: "Legs" },
+  { point: "BL-57", pinyin: "", functionText: "Difficulty sitting (AMA 315)", category: "Generalized" },
+  { point: "BL-57", pinyin: "", functionText: "Difficulty standing (AMA 315)", category: "Generalized" },
+  { point: "BL-57", pinyin: "", functionText: "Inability to stand for long (AMA 315)", category: "Legs" },
+  { point: "BL-57", pinyin: "", functionText: "Pain of the sinews (AMA 315)", category: "Generalized" },
+  { point: "BL-57", pinyin: "", functionText: "Contraction of the sinews (A?? 315)", category: "Generalized" },
+  { point: "BL-57", pinyin: "", functionText: "Leg qi with swollen knee (AMA 315)", category: "Knee" },
+  { point: "BL-57", pinyin: "", functionText: "Heavy legs (AMA 315)", category: "Legs" },
+  { point: "BL-57", pinyin: "", functionText: "Flaccidity of the leg (AMA 315)", category: "Legs" },
+  { point: "BL-57", pinyin: "", functionText: "Weakness of the leg (AMA 315)", category: "Legs" },
+  { point: "BL-57", pinyin: "", functionText: "Pain of the heel (AMA 315)", category: "Foot" },
+  { point: "BL-57", pinyin: "", functionText: "Heat sensation in the soles with inability to stand for long (AMA 315)", category: "Foot" },
+  { point: "BL-58", pinyin: "", functionText: "Pain of the neck (AMA 316)", category: "Neck" },
+  { point: "BL-58", pinyin: "", functionText: "Pain of the occiput (AMA 316)", category: "Head" },
+  { point: "BL-58", pinyin: "", functionText: "Pain of the head (AMA 316)", category: "Head" },
+  { point: "BL-58", pinyin: "", functionText: "Pain of the back (AMA 316)", category: "Back" },
+  { point: "BL-58", pinyin: "", functionText: "Lumbar pain (AMA 316)", category: "Back" },
+  { point: "BL-58", pinyin: "", functionText: "Heaviness of the body with inability to sit (AMA 316)", category: "Generalized" },
+  { point: "BL-58", pinyin: "", functionText: "Heaviness of the body with inability to stand (AMA 316)", category: "Generalized" },
+  { point: "BL-58", pinyin: "", functionText: "Shivering with inability to sit for long (AMA 316)", category: "Generalized" },
+  { point: "BL-58", pinyin: "", functionText: "Shivering with inability to stand for long (AMA 316)", category: "Generalized" },
+  { point: "BL-58", pinyin: "", functionText: "Atrophy disorfer fo the lower limb (AMA 316)", category: "Legs" },
+  { point: "BL-58", pinyin: "", functionText: "Coldness of the lower part of the body (AMA 316)", category: "Legs" },
+  { point: "BL-58", pinyin: "", functionText: "Weakness of the legs (AMA 316)", category: "Legs" },
+  { point: "BL-58", pinyin: "", functionText: "Difficulty in walking (AMA 316)", category: "Generalized" },
+  { point: "BL-58", pinyin: "", functionText: "Swelling of the lower limb (AMA 316)", category: "Legs" },
+  { point: "BL-58", pinyin: "", functionText: "Pain of the lower limb (AMA 316)", category: "Legs" },
+  { point: "BL-58", pinyin: "", functionText: "Sciatica (AMA 316)", category: "Legs" },
+  { point: "BL-58", pinyin: "", functionText: "Wind painful obstruction of the joints (AMA 316)", category: "Generalized" },
+  { point: "BL-58", pinyin: "", functionText: "Inability to flex or extend the toes (AMA 316)", category: "Toes" },
+  { point: "BL-59", pinyin: "", functionText: "Lumbar pain with inability to stand for long (AMA 317)", category: "Back" },
+  { point: "BL-59", pinyin: "", functionText: "Inability to stand for long after sitting (AMA 317)", category: "Legs" },
+  { point: "BL-59", pinyin: "", functionText: "Thigh pain (AMA 317)", category: "Legs" },
+  { point: "BL-59", pinyin: "", functionText: "Wind painful obstruction with numbness (AMA 317)", category: "Generalized" },
+  { point: "BL-59", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 317)", category: "Legs" },
+  { point: "BL-59", pinyin: "", functionText: "Inability to raise the four limbs (AMA 317)", category: "Generalized" },
+  { point: "BL-59", pinyin: "", functionText: "Heaviness of the leg (AMA 317)", category: "Legs" },
+  { point: "BL-59", pinyin: "", functionText: "Heaviness of the knee (AMA 317)", category: "Knee" },
+  { point: "BL-59", pinyin: "", functionText: "Soreness of the leg (AMA 317)", category: "Legs" },
+  { point: "BL-59", pinyin: "", functionText: "Soreness of the knee (AMA 317)", category: "Knee" },
+  { point: "BL-59", pinyin: "", functionText: "Sciatica (AMA 317)", category: "Legs" },
+  { point: "BL-59", pinyin: "", functionText: "Redness of the lateral malleolus (AMA 317)", category: "Ankle" },
+  { point: "BL-59", pinyin: "", functionText: "Swelling of the lateral malleolus (AMA 317)", category: "Ankle" },
+  { point: "BL-60", pinyin: "", functionText: "Relaxes the sinews (AMA 318)", category: "Generalized" },
+  { point: "BL-60", pinyin: "", functionText: "Strengthens the lumbar spine (AMA 318)", category: "Back" },
+  { point: "BL-60", pinyin: "", functionText: "Stiff neck (AMA 318)", category: "Neck" },
+  { point: "BL-60", pinyin: "", functionText: "Contraction of the shoulder (AMA 318)", category: "Shoulder" },
+  { point: "BL-60", pinyin: "", functionText: "Contraction of the back (AMA 318)", category: "Back" },
+  { point: "BL-60", pinyin: "", functionText: "Lumbar pain (AMA 318)", category: "Back" },
+  { point: "BL-60", pinyin: "", functionText: "Sacral pain (A?? 318)", category: "Hips" },
+  { point: "BL-60", pinyin: "", functionText: "Pain of the co???? (??? 318)", category: "Hips" },
+  { point: "BL-60", pinyin: "", functionText: "Sciatica (AMA 318)", category: "Legs" },
+  { point: "BL-60", pinyin: "", functionText: "Pain behind the knee (AMA 318)", category: "Knee" },
+  { point: "BL-60", pinyin: "", functionText: "Ankle pain (A?? 318)", category: "Ankle" },
+  { point: "BL-60", pinyin: "", functionText: "Heel pain (AMA 318)", category: "Foot" },
+  { point: "BL-61", pinyin: "", functionText: "Lumbar pain (AMA 320)", category: "Back" },
+  { point: "BL-61", pinyin: "", functionText: "Swelling of the knee (AMA 320)", category: "Knee" },
+  { point: "BL-61", pinyin: "", functionText: "Heel pain (AMA 320)", category: "Foot" },
+  { point: "BL-62", pinyin: "", functionText: "Lockjaw (AMA 320)", category: "Head" },
+  { point: "BL-62", pinyin: "", functionText: "Stiffness of the nape of the neck (AMA 321)", category: "Neck" },
+  { point: "BL-62", pinyin: "", functionText: "Stiffness in extending the back (AMA 321)", category: "Back" },
+  { point: "BL-62", pinyin: "", functionText: "Difficulty in extending the back (AMA 321)", category: "Back" },
+  { point: "BL-62", pinyin: "", functionText: "Cold painful obstruction of the lumbar region (AMA 321)", category: "Back" },
+  { point: "BL-62", pinyin: "", functionText: "Cold painful obstruction of the leg (AMA 321)", category: "Legs" },
+  { point: "BL-62", pinyin: "", functionText: "Difficulty in extending the knee (AMA 321)", category: "Knee" },
+  { point: "BL-62", pinyin: "", functionText: "Difficulty in flexing the knee (A?? 321)", category: "Knee" },
+  { point: "BL-62", pinyin: "", functionText: "Redness of the lateral malleolus (AMA 321)", category: "Ankle" },
+  { point: "BL-62", pinyin: "", functionText: "Swelling of the lateral malleolus (AMA 321)", category: "Ankle" },
+  { point: "BL-62", pinyin: "", functionText: "Straw shoe wind (redness, swelling and pain of the leg and foot) (AMA 321)", category: "Legs" },
+  { point: "BL-63", pinyin: "", functionText: "Shivering with inability to stand for long (AMA 322)", category: "Generalized" },
+  { point: "BL-63", pinyin: "", functionText: "Lumbar pain (AMA 322)", category: "Back" },
+  { point: "BL-63", pinyin: "", functionText: "Knee pain (A?? 322)", category: "Knee" },
+  { point: "BL-63", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 322)", category: "Legs" },
+  { point: "BL-63", pinyin: "", functionText: "Pain of the external malleolus (AMA 322)", category: "Ankle" },
+  { point: "BL-64", pinyin: "", functionText: "Stiff neck (AMA 323)", category: "Neck" },
+  { point: "BL-64", pinyin: "", functionText: "Pain of the back of the body (AMA 323)", category: "Back" },
+  { point: "BL-64", pinyin: "", functionText: "Pain of the sides of the body (AMA 323)", category: "Generalized" },
+  { point: "BL-64", pinyin: "", functionText: "Lumbar pain (AMA 323)", category: "Back" },
+  { point: "BL-64", pinyin: "", functionText: "Cold damp leg qi (AMA 323)", category: "Legs" },
+  { point: "BL-65", pinyin: "", functionText: "Pain of the lumbar region (AMA 324)", category: "Back" },
+  { point: "BL-65", pinyin: "", functionText: "Pain of the back (AMA 324)", category: "Back" },
+  { point: "BL-65", pinyin: "", functionText: "Thigh pain (A?? 324)", category: "Legs" },
+  { point: "BL-66", pinyin: "", functionText: "Neck pain (AMA 325)", category: "Neck" },
+  { point: "BL-67", pinyin: "", functionText: "Neck pain (AMA 325)", category: "Neck" },
+  { point: "BL-67", pinyin: "", functionText: "Pain of the lateral costal region (AMA 325)", category: "Generalized" },
+  { point: "BL-67", pinyin: "", functionText: "Swelling of the knees (AMA 326)", category: "Knee" },
+  { point: "KI-1", pinyin: "", functionText: "Lower limb paralysis (A?? 336)", category: "Legs" },
+  { point: "KI-1", pinyin: "", functionText: "Chronic leg qi (AMA 336)", category: "Legs" },
+  { point: "KI-1", pinyin: "", functionText: "Pain of the leg (AMA 336)", category: "Legs" },
+  { point: "KI-1", pinyin: "", functionText: "Swelling of the leg (AMA 336)", category: "Legs" },
+  { point: "KI-1", pinyin: "", functionText: "Cold sensation of the feet (AM?? 336)", category: "Foot" },
+  { point: "KI-1", pinyin: "", functionText: "Cold sensation of the shins (AMA 336)", category: "Legs" },
+  { point: "KI-1", pinyin: "", functionText: "Heat in the soles of the feet (AMA 336)", category: "Foot" },
+  { point: "KI-1", pinyin: "", functionText: "Chronic pain of the foot (AMA 336)", category: "Foot" },
+  { point: "KI-1", pinyin: "", functionText: "Numbness of the foot (AMA 336)", category: "Foot" },
+  { point: "KI-1", pinyin: "", functionText: "Pain of the five toes with inability to stand (AMA 336)", category: "Toes" },
+  { point: "KI-2", pinyin: "", functionText: "Pain of the lower legs which prevents standing for long (AMA 338)", category: "Legs" },
+  { point: "KI-2", pinyin: "", functionText: "Pain of the instep (AMA 338)", category: "Foot" },
+  { point: "KI-2", pinyin: "", functionText: "Swelling of the instep (AMA 338)", category: "Foot" },
+  { point: "KI-2", pinyin: "", functionText: "Restless feet (AMA 338)", category: "Foot" },
+  { point: "KI-3", pinyin: "", functionText: "Lumbar pain (AMA 340)", category: "Back" },
+  { point: "KI-3", pinyin: "", functionText: "Pain of the lateral costal region (AMA 340)", category: "Generalized" },
+  { point: "KI-3", pinyin: "", functionText: "Numbness of the legs (AMA 340)", category: "Legs" },
+  { point: "KI-3", pinyin: "", functionText: "Pain of the legs (AMA 340)", category: "Legs" },
+  { point: "KI-3", pinyin: "", functionText: "Swelling of the ankle (AMA 340)", category: "Ankle" },
+  { point: "KI-3", pinyin: "", functionText: "Pain of the ankle (AMA 340)", category: "Ankle" },
+  { point: "KI-3", pinyin: "", functionText: "Swelling of the heel (AMA 340)", category: "Foot" },
+  { point: "KI-3", pinyin: "", functionText: "Pain of the heel (AMA 340)", category: "Foot" },
+  { point: "KI-4", pinyin: "", functionText: "Stiffness of the lumbar region (AMA 342)", category: "Back" },
+  { point: "KI-4", pinyin: "", functionText: "Pain of the lumbar region (A?? 342)", category: "Back" },
+  { point: "KI-4", pinyin: "", functionText: "Pain of the heel (AMA 342)", category: "Foot" },
+  { point: "KI-4", pinyin: "", functionText: "Swelling of the heel (AMA 342)", category: "Foot" },
+  { point: "KI-6", pinyin: "", functionText: "Oppressive sensation of the body (AMA 345)", category: "Generalized" },
+  { point: "KI-6", pinyin: "", functionText: "Tightness of the inner aspect of the leg (AMA 345)", category: "Legs" },
+  { point: "KI-6", pinyin: "", functionText: "Contraction of the inner aspect of the leg (A?? 345)", category: "Legs" },
+  { point: "KI-6", pinyin: "", functionText: "Weariness of the four limbs (AMA 345)", category: "Generalized" },
+  { point: "KI-6", pinyin: "", functionText: "Pain of the four limbs (AMA 345)", category: "Generalized" },
+  { point: "KI-6", pinyin: "", functionText: "Cold damp leg qi (AMA 345)", category: "Legs" },
+  { point: "KI-6", pinyin: "", functionText: "Cramps of the feet (AMA 345)", category: "Foot" },
+  { point: "KI-6", pinyin: "", functionText: "Cramps of the hands (AMA 345)", category: "Hand" },
+  { point: "KI-7", pinyin: "", functionText: "Strengthens the lumbar region (AMA 346)", category: "Back" },
+  { point: "KI-7", pinyin: "", functionText: "Swelling of the lower limb (??? 346)", category: "Legs" },
+  { point: "KI-7", pinyin: "", functionText: "Pain of the lumbar region (AMA 347)", category: "Back" },
+  { point: "KI-7", pinyin: "", functionText: "Lumbar pain due to qi stagnation (AMA 347)", category: "Back" },
+  { point: "KI-7", pinyin: "", functionText: "Atrophy disorfer of the leg (A?? 347)", category: "Legs" },
+  { point: "KI-7", pinyin: "", functionText: "Cold legs (AMA 347)", category: "Legs" },
+  { point: "KI-7", pinyin: "", functionText: "Cold bones (A?? 347)", category: "Generalized" },
+  { point: "KI-7", pinyin: "", functionText: "Hot bones (A?? 347)", category: "Generalized" },
+  { point: "KI-8", pinyin: "", functionText: "Lumbar pain (AMA 348)", category: "Back" },
+  { point: "KI-8", pinyin: "", functionText: "Pain of the inner aspect of the leg (AMA 348)", category: "Legs" },
+  { point: "KI-9", pinyin: "", functionText: "Pain of the medial aspect of the leg (A?? 349)", category: "Legs" },
+  { point: "KI-9", pinyin: "", functionText: "Contraction of the calf muscle (AMA 349)", category: "Legs" },
+  { point: "KI-9", pinyin: "", functionText: "Weakness of the legs (AMA 349)", category: "Legs" },
+  { point: "KI-10", pinyin: "", functionText: "Drilling knee pain with immobility (AMA 350)", category: "Knee" },
+  { point: "KI-10", pinyin: "", functionText: "Pain of the inner aspect of the thigh (AMA 350)", category: "Legs" },
+  { point: "KI-13", pinyin: "", functionText: "Lumbar pain (AMA 353)", category: "Back" },
+  { point: "KI-14", pinyin: "", functionText: "Pain of both lateral costal regions (A?? 354)", category: "Generalized" },
+  { point: "KI-15", pinyin: "", functionText: "Pain of the lumbar spine (AMA 355)", category: "Back" },
+  { point: "KI-19", pinyin: "", functionText: "Pain of the lateral costal region (AMA 358)", category: "Generalized" },
+  { point: "KI-20", pinyin: "", functionText: "Pain of the lateral costal region (AMA 358)", category: "Generalized" },
+  { point: "KI-21", pinyin: "", functionText: "Distention of the lateral costal region (AMA 359)", category: "Generalized" },
+  { point: "KI-21", pinyin: "", functionText: "Pain of the chest radiating to the back (AMA 359)", category: "Generalized" },
+  { point: "KI-21", pinyin: "", functionText: "Pain of the lateral costal region radiating to the back (AMA 359)", category: "Generalized" },
+  { point: "KI-22", pinyin: "", functionText: "Pain of the chest (AMA 360)", category: "Generalized" },
+  { point: "KI-22", pinyin: "", functionText: "Pain of the ribs (AMA 360)", category: "Generalized" },
+  { point: "KI-27", pinyin: "", functionText: "Steaming bone disorder (AMA 363)", category: "Generalized" },
+  { point: "PC-1", pinyin: "", functionText: "Pain of the lateral costal region (AMA 371)", category: "Generalized" },
+  { point: "PC-1", pinyin: "", functionText: "Pain of the axilla (AMA 371)", category: "Generalized" },
+  { point: "PC-1", pinyin: "", functionText: "Inability to raise the four limbs (AMA 371)", category: "Generalized" },
+  { point: "PC-1", pinyin: "", functionText: "Pain of the arm (AMA 371)", category: "Generalized" },
+  { point: "PC-2", pinyin: "", functionText: "Pain of the back (AMA 371)", category: "Back" },
+  { point: "PC-2", pinyin: "", functionText: "Pain of the shoulder (AMA 371)", category: "Shoulder" },
+  { point: "PC-2", pinyin: "", functionText: "Pain of the shoulder blade (AMA 371)", category: "Shoulder" },
+  { point: "PC-2", pinyin: "", functionText: "Pain of the arm (AMA 371)", category: "Generalized" },
+  { point: "PC-2", pinyin: "", functionText: "Pain of the medial aspect of the upper arm (A?? 371)", category: "Generalized" },
+  { point: "PC-3", pinyin: "", functionText: "Tremor of the head (A?? 372)", category: "Head" },
+  { point: "PC-3", pinyin: "", functionText: "Tremor of the hand (AMA 372)", category: "Hand" },
+  { point: "PC-3", pinyin: "", functionText: "Tremor of the arm (AMA 372)", category: "Generalized" },
+  { point: "PC-3", pinyin: "", functionText: "Paralysis of the upper limb (AMA 372)", category: "Generalized" },
+  { point: "PC-6", pinyin: "", functionText: "Pain of the head (AMA 377)", category: "Head" },
+  { point: "PC-6", pinyin: "", functionText: "Pain of the neck (AMA 377)", category: "Neck" },
+  { point: "PC-6", pinyin: "", functionText: "Pain of the elbow (AMA 377)", category: "Elbow" },
+  { point: "PC-6", pinyin: "", functionText: "Pain of the upper arm (AMA 377)", category: "Generalized" },
+  { point: "PC-6", pinyin: "", functionText: "Contraction of the elbow (AMA 377)", category: "Elbow" },
+  { point: "PC-6", pinyin: "", functionText: "Contraction of the upper arm (AMA 377)", category: "Generalized" },
+  { point: "PC-7", pinyin: "", functionText: "Pain of the lateral costal region (AMA 379)", category: "Generalized" },
+  { point: "PC-7", pinyin: "", functionText: "Contraction of the hand (AMA 379)", category: "Hand" },
+  { point: "PC-7", pinyin: "", functionText: "Pain of the elbow (AMA 379)", category: "Elbow" },
+  { point: "PC-7", pinyin: "", functionText: "Contraction of the elbow (AM?? 379)", category: "Elbow" },
+  { point: "PC-7", pinyin: "", functionText: "Wrist pain (AMA 379)", category: "Wrist" },
+  { point: "PC-8", pinyin: "", functionText: "Pain of the lateral costal region (AMA 381)", category: "Generalized" },
+  { point: "PC-8", pinyin: "", functionText: "Tremor of the hand (AMA 381)", category: "Hand" },
+  { point: "PC-8", pinyin: "", functionText: "Hand painful obstruction (A?? 381)", category: "Hand" },
+  { point: "SJ-1", pinyin: "", functionText: "Pain of the submandibular region (AMA 391)", category: "Head" },
+  { point: "SJ-1", pinyin: "", functionText: "Pain of the elbow (AMA 391)", category: "Elbow" },
+  { point: "SJ-1", pinyin: "", functionText: "Pain of the shoulder (AMA 391)", category: "Shoulder" },
+  { point: "SJ-1", pinyin: "", functionText: "Pain of the shoulder with inability to turn and look backwards (AMA 391)", category: "Shoulder" },
+  { point: "SJ-1", pinyin: "", functionText: "Pain of the back with inability to turn and look backwards (A?? 391)", category: "Back" },
+  { point: "SJ-2", pinyin: "", functionText: "Pain of the arm (AMA 393)", category: "Generalized" },
+  { point: "SJ-2", pinyin: "", functionText: "Inability to raise the arm due to pain (AMA 393)", category: "Generalized" },
+  { point: "SJ-2", pinyin: "", functionText: "Pain of the back of the hand (AMA 393)", category: "Hand" },
+  { point: "SJ-2", pinyin: "", functionText: "Contraction of the five fingers (AMA 393)", category: "Finger" },
+  { point: "SJ-2", pinyin: "", functionText: "Weakness of the wrist (AMA 393)", category: "Wrist" },
+  { point: "SJ-2", pinyin: "", functionText: "Neck pain (A?? 393)", category: "Neck" },
+  { point: "SJ-3", pinyin: "", functionText: "Inability to flex fingers (AMA 394)", category: "Finger" },
+  { point: "SJ-3", pinyin: "", functionText: "Inability to extend the fingers (AMA 394)", category: "Finger" },
+  { point: "SJ-3", pinyin: "", functionText: "Redness of the elbow extending into the shoulders (AMA 394)", category: "Elbow" },
+  { point: "SJ-3", pinyin: "", functionText: "Redness of the upper arm extending into the shoulders (AMA 394)", category: "Generalized" },
+  { point: "SJ-3", pinyin: "", functionText: "Swelling of the elbow extending into the shoulders (AMA 394)", category: "Elbow" },
+  { point: "SJ-3", pinyin: "", functionText: "Swelling of the upper arm extending into the shoulders (AMA 394)", category: "Generalized" },
+  { point: "SJ-3", pinyin: "", functionText: "Pain of the elbow extending into the shoulders (AMA 394)", category: "Elbow" },
+  { point: "SJ-3", pinyin: "", functionText: "Pain of the upper arm extending into the shoulders (AMA 394)", category: "Generalized" },
+  { point: "SJ-3", pinyin: "", functionText: "Numbness of the four limbs (AMA 394)", category: "Generalized" },
+  { point: "SJ-3", pinyin: "", functionText: "Pain of the spine at the level of the Heart (A?? 394)", category: "Back" },
+  { point: "SJ-4", pinyin: "", functionText: "Pain of the neck (AMA 395)", category: "Neck" },
+  { point: "SJ-4", pinyin: "", functionText: "Pain of the shoulder (AMA 395)", category: "Shoulder" },
+  { point: "SJ-4", pinyin: "", functionText: "Pain of the arm (AMA 395)", category: "Generalized" },
+  { point: "SJ-4", pinyin: "", functionText: "Weakness of the wrist (AMA 395)", category: "Wrist" },
+  { point: "SJ-4", pinyin: "", functionText: "Pain of the wrist (AMA 395)", category: "Wrist" },
+  { point: "SJ-4", pinyin: "", functionText: "Redness of the wrist (AMA 395)", category: "Wrist" },
+  { point: "SJ-4", pinyin: "", functionText: "Swelling of the wrist (AMA 395)", category: "Wrist" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the nape of the neck (AMA 396)", category: "Neck" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the lateral costal region (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the back (AMA 396)", category: "Back" },
+  { point: "SJ-5", pinyin: "", functionText: "Stiff neck (AMA 396)", category: "Neck" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the ribs (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the lateral costal region (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Numbness of the elbow (AMA 396)", category: "Elbow" },
+  { point: "SJ-5", pinyin: "", functionText: "Numbness of the arm (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the elbow (AMA 396)", category: "Elbow" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the arm (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Contraction of the elbow (AM?? 396)", category: "Elbow" },
+  { point: "SJ-5", pinyin: "", functionText: "Flaccidity of the elbow (AMA 396)", category: "Elbow" },
+  { point: "SJ-5", pinyin: "", functionText: "Soreness of the elbow (AMA 396)", category: "Elbow" },
+  { point: "SJ-5", pinyin: "", functionText: "Soreness of the wrist (AMA 396)", category: "Wrist" },
+  { point: "SJ-5", pinyin: "", functionText: "Heaviness of the elbow (AMA 396)", category: "Elbow" },
+  { point: "SJ-5", pinyin: "", functionText: "Heaviness of the wrist (AMA 396)", category: "Wrist" },
+  { point: "SJ-5", pinyin: "", functionText: "Swelling of the arm (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Redness of the arm (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Paralysis of the arm (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Swelling of the arm (AMA 396)", category: "Generalized" },
+  { point: "SJ-5", pinyin: "", functionText: "Severe pain of the fingers with inability to grasp objects (AMA 396)", category: "Finger" },
+  { point: "SJ-5", pinyin: "", functionText: "Numbness of the hands (AMA 396)", category: "Hand" },
+  { point: "SJ-5", pinyin: "", functionText: "Numbness of the feet (AMA 396)", category: "Foot" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the hands (AMA 396)", category: "Hand" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the feet (AMA 396)", category: "Foot" },
+  { point: "SJ-5", pinyin: "", functionText: "Tremor of the hand (AMA 396)", category: "Hand" },
+  { point: "SJ-5", pinyin: "", functionText: "Swelling of the ankle (AMA 396)", category: "Ankle" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the ankle (AMA 396)", category: "Ankle" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the toes (AMA 396)", category: "Toes" },
+  { point: "SJ-5", pinyin: "", functionText: "Pain of the hundred joints (A?? 396)", category: "Generalized" },
+  { point: "SJ-6", pinyin: "", functionText: "Lockjaw (AMA 399)", category: "Head" },
+  { point: "SJ-6", pinyin: "", functionText: "Pain of the lateral costal region (AMA 399)", category: "Generalized" },
+  { point: "SJ-6", pinyin: "", functionText: "Pain of the axilla (AMA 399)", category: "Generalized" },
+  { point: "SJ-6", pinyin: "", functionText: "Pain of the shoulder (AMA 399)", category: "Shoulder" },
+  { point: "SJ-6", pinyin: "", functionText: "Pain of the arm (AMA 399)", category: "Generalized" },
+  { point: "SJ-6", pinyin: "", functionText: "Pain of the back (AMA 399)", category: "Back" },
+  { point: "SJ-6", pinyin: "", functionText: "Painful obstruction of the elbow (AMA 399)", category: "Elbow" },
+  { point: "SJ-6", pinyin: "", functionText: "Tremor of the hand (AMA 399)", category: "Hand" },
+  { point: "SJ-6", pinyin: "", functionText: "Cold-wind hand trembling (A?? 399)", category: "Hand" },
+  { point: "SJ-6", pinyin: "", functionText: "Numbness of the hand (AMA 399)", category: "Hand" },
+  { point: "SJ-7", pinyin: "", functionText: "Pain of the skin (AMA 400)", category: "Generalized" },
+  { point: "SJ-7", pinyin: "", functionText: "Pain of the flesh (AMA 400)", category: "Generalized" },
+  { point: "SJ-8", pinyin: "", functionText: "No desire to move the limbs (AMA 401)", category: "Generalized" },
+  { point: "SJ-8", pinyin: "", functionText: "Inability to move the arm (A?? 401)", category: "Generalized" },
+  { point: "SJ-8", pinyin: "", functionText: "Pain of the arm (AMA 401)", category: "Generalized" },
+  { point: "SJ-8", pinyin: "", functionText: "Lumbar pain due to traumatic injury (AMA 401)", category: "Back" },
+  { point: "SJ-9", pinyin: "", functionText: "Pain of the forearm (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the lateral costal region (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Atrophy disorder (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Numbness of the arm (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Painful obstruction of the arm (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Wind painful obstruction with contraction fo the sinews (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the bones (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the neck (AMA 402)", category: "Neck" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the upper back (AMA 402)", category: "Back" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the scapula (AMA 402)", category: "Shoulder" },
+  { point: "SJ-10", pinyin: "", functionText: "Numbness of the shoulder (AMA 402)", category: "Shoulder" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the shoulder (AMA 402)", category: "Shoulder" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the arm (AMA 402)", category: "Generalized" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the elbow radiating to the shoulder (AMA 402)", category: "Elbow" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the elbow (AMA 402)", category: "Elbow" },
+  { point: "SJ-10", pinyin: "", functionText: "Pain of the lumbar region due to traumatic injury (AMA 402)", category: "Back" },
+  { point: "SJ-11", pinyin: "", functionText: "Heaviness of the head with pain of the submandibular region (AMA 404)", category: "Head" },
+  { point: "SJ-11", pinyin: "", functionText: "Difficulty in raising the shoulder (AMA 404)", category: "Shoulder" },
+  { point: "SJ-11", pinyin: "", functionText: "Difficulty in raising the arm (AMA 404)", category: "Generalized" },
+  { point: "SJ-11", pinyin: "", functionText: "Difficulty in putting on clothes (AMA 404)", category: "Generalized" },
+  { point: "SJ-11", pinyin: "", functionText: "Painful obstruction of the shoulder (AMA 404)", category: "Shoulder" },
+  { point: "SJ-11", pinyin: "", functionText: "Painful obstruction of the arm (AMA 404)", category: "Generalized" },
+  { point: "SJ-11", pinyin: "", functionText: "Fixed painful obstruction (AMA 404)", category: "Generalized" },
+  { point: "SJ-12", pinyin: "", functionText: "Stiffness of the nape with inability to turn the head (AMA 404)", category: "Neck" },
+  { point: "SJ-12", pinyin: "", functionText: "Stiffness of the back with inability to turn the head (AMA 404)", category: "Back" },
+  { point: "SJ-12", pinyin: "", functionText: "Pain of the nape with inability to turn the head (AMA 404)", category: "Neck" },
+  { point: "SJ-12", pinyin: "", functionText: "Stiffness of the nape with inability to turn the head (AMA 404)", category: "Neck" },
+  { point: "SJ-12", pinyin: "", functionText: "Pain of the shoulder (AMA 404)", category: "Shoulder" },
+  { point: "SJ-12", pinyin: "", functionText: "Pain of the arm (AMA 404)", category: "Generalized" },
+  { point: "SJ-12", pinyin: "", functionText: "Wind painful obstruction (AMA 404)", category: "Generalized" },
+  { point: "SJ-13", pinyin: "", functionText: "Weakness of the shoulder (AMA 405)", category: "Shoulder" },
+  { point: "SJ-13", pinyin: "", functionText: "Weakness of the arm (AMA 405)", category: "Generalized" },
+  { point: "SJ-13", pinyin: "", functionText: "Pain of the shoulder (AMA 405)", category: "Shoulder" },
+  { point: "SJ-13", pinyin: "", functionText: "Pain of the arm (AMA 405)", category: "Generalized" },
+  { point: "SJ-13", pinyin: "", functionText: "Swelling of the shoulder that leads to pain in the scapula (AMA 405)", category: "Shoulder" },
+  { point: "SJ-13", pinyin: "", functionText: "Inability to raise the arm (AMA 405)", category: "Generalized" },
+  { point: "SJ-14", pinyin: "", functionText: "Shoulder pain (AMA 406)", category: "Shoulder" },
+  { point: "SJ-14", pinyin: "", functionText: "Heaviness of the shoulder with inability to raise the arm (AMA 406)", category: "Shoulder" },
+  { point: "SJ-14", pinyin: "", functionText: "Numbness (AMA 406)", category: "Generalized" },
+  { point: "SJ-14", pinyin: "", functionText: "Paralysis of the arm (AMA 406)", category: "Generalized" },
+  { point: "SJ-14", pinyin: "", functionText: "Pain of the arm (AMA 406)", category: "Generalized" },
+  { point: "SJ-15", pinyin: "", functionText: "Pain of the shoulder (AMA 406)", category: "Shoulder" },
+  { point: "SJ-15", pinyin: "", functionText: "Pain of the arm (AMA 406)", category: "Generalized" },
+  { point: "SJ-15", pinyin: "", functionText: "Stiffness of the neck (AMA 406)", category: "Neck" },
+  { point: "SJ-15", pinyin: "", functionText: "Pain of the neck (AMA 406)", category: "Neck" },
+  { point: "SJ-15", pinyin: "", functionText: "Tension of the nape of the neck (AMA 406)", category: "Neck" },
+  { point: "SJ-15", pinyin: "", functionText: "Pain in the supraclavicular fossa (AMA 406)", category: "Shoulder" },
+  { point: "SJ-16", pinyin: "", functionText: "Stiffness of the neck with inability to turn the head (AMA 407)", category: "Neck" },
+  { point: "SJ-16", pinyin: "", functionText: "Pain of the neck with inability to turn the head (AMA 407)", category: "Neck" },
+  { point: "SJ-16", pinyin: "", functionText: "Swelling of the supraclavicular fossa (AMA 407)", category: "Shoulder" },
+  { point: "SJ-17", pinyin: "", functionText: "Lockjaw (AMA 208)", category: "Head" },
+  { point: "SJ-19", pinyin: "", functionText: "Pain of the lateral costal region (AMA 409)", category: "Generalized" },
+  { point: "SJ-21", pinyin: "", functionText: "Lockjaw (AMA 411)", category: "Head" },
+  { point: "SJ-21", pinyin: "", functionText: "Neck pain (A?? 411)", category: "Neck" },
+  { point: "SJ-22", pinyin: "", functionText: "Lockjaw (AMA 412)", category: "Head" },
+  { point: "SJ-22", pinyin: "", functionText: "Swelling of the submandibular region (AMA 412)", category: "Head" },
+  { point: "SJ-23", pinyin: "", functionText: "Tetany (AMA 412)", category: "Generalized" },
+  { point: "GB-2", pinyin: "", functionText: "Pain of the mandibular joint (AMA 423)", category: "Head" },
+  { point: "GB-2", pinyin: "", functionText: "Dislocation of the jaw (AMA 423)", category: "Head" },
+  { point: "GB-2", pinyin: "", functionText: "Difficulty in masticating (AMA 423)", category: "Head" },
+  { point: "GB-3", pinyin: "", functionText: "Lockjaw (AMA 424)", category: "Head" },
+  { point: "GB-3", pinyin: "", functionText: "Tetany leading to bone pain (AMA 424)", category: "Generalized" },
+  { point: "GB-4", pinyin: "", functionText: "Lockjaw (AMA 425)", category: "Head" },
+  { point: "GB-4", pinyin: "", functionText: "Neck pain (AMA 425)", category: "Neck" },
+  { point: "GB-4", pinyin: "", functionText: "Wrist pain (AMA 425)", category: "Wrist" },
+  { point: "GB-4", pinyin: "", functionText: "Inability to flex the wrist (AMA 425)", category: "Wrist" },
+  { point: "GB-7", pinyin: "", functionText: "Swelling of the submandibular region (AMA 426)", category: "Head" },
+  { point: "GB-7", pinyin: "", functionText: "Lockjaw (AMA 426)", category: "Head" },
+  { point: "GB-7", pinyin: "", functionText: "Stiff neck with inability to turn the head (AMA 426)", category: "Neck" },
+  { point: "GB-10", pinyin: "", functionText: "Stiffness of the neck (AMA 429)", category: "Neck" },
+  { point: "GB-10", pinyin: "", functionText: "Pain of the neck (AMA 429)", category: "Neck" },
+  { point: "GB-10", pinyin: "", functionText: "Pain of the shoulder (AMA 429)", category: "Shoulder" },
+  { point: "GB-10", pinyin: "", functionText: "Pain of the arm (AMA 429)", category: "Generalized" },
+  { point: "GB-10", pinyin: "", functionText: "Inability to raise the arm (AMA 429)", category: "Generalized" },
+  { point: "GB-10", pinyin: "", functionText: "Flaccidity of the legs with inability to walk (AMA 429)", category: "Legs" },
+  { point: "GB-11", pinyin: "", functionText: "Stiffness of the neck (AMA 430)", category: "Neck" },
+  { point: "GB-11", pinyin: "", functionText: "Pain of the neck (AMA 430)", category: "Neck" },
+  { point: "GB-11", pinyin: "", functionText: "Pain of the lateral costal region (AMA 430)", category: "Generalized" },
+  { point: "GB-11", pinyin: "", functionText: "Contraction of the sinews of the four limbs (A?? 430)", category: "Generalized" },
+  { point: "GB-11", pinyin: "", functionText: "Bone taxation (AMA 430)", category: "Generalized" },
+  { point: "GB-11", pinyin: "", functionText: "Agitation of the hands (AMA 430)", category: "Hand" },
+  { point: "GB-11", pinyin: "", functionText: "Agitation of the feet (AMA 430)", category: "Foot" },
+  { point: "GB-12", pinyin: "", functionText: "Stiffness of the neck with inability to turn the head (AMA 430)", category: "Neck" },
+  { point: "GB-12", pinyin: "", functionText: "Pain of the neck with inability to turn the head (AMA 430)", category: "Neck" },
+  { point: "GB-12", pinyin: "", functionText: "Weakness of the legs (AMA 430)", category: "Legs" },
+  { point: "GB-12", pinyin: "", functionText: "Flaccidity of the legs (AMA 430)", category: "Legs" },
+  { point: "GB-12", pinyin: "", functionText: "Atrophy disorder of the arms (AMA 430)", category: "Generalized" },
+  { point: "GB-12", pinyin: "", functionText: "Atrophy disorder of the legs (AMA 430)", category: "Legs" },
+  { point: "GB-13", pinyin: "", functionText: "Stiffness of the neck (AMA 431)", category: "Neck" },
+  { point: "GB-13", pinyin: "", functionText: "Pain of the neck (AMA 431)", category: "Neck" },
+  { point: "GB-13", pinyin: "", functionText: "Pain of the chest with inability to turn the body (AMA 431)", category: "Generalized" },
+  { point: "GB-13", pinyin: "", functionText: "Pain of the lateral costal region with inability to turn the body (AMA 431)", category: "Generalized" },
+  { point: "GB-15", pinyin: "", functionText: "Pain of the occiput (A?? 433)", category: "Head" },
+  { point: "GB-15", pinyin: "", functionText: "Pain of the forehead (AMA 433)", category: "Head" },
+  { point: "GB-15", pinyin: "", functionText: "Pain of the supraorbital ridge (AMA 433)", category: "Head" },
+  { point: "GB-15", pinyin: "", functionText: "Pain of the supraclavisular fossa (AMA 433)", category: "Shoulder" },
+  { point: "GB-17", pinyin: "", functionText: "Stiff neck (AMA 434)", category: "Neck" },
+  { point: "GB-17", pinyin: "", functionText: "Stiffness of the lips (AMA 434)", category: "Head" },
+  { point: "GB-19", pinyin: "", functionText: "Heaviness of the head (AMA 436)", category: "Head" },
+  { point: "GB-19", pinyin: "", functionText: "Stiffness of the neck with inability to turn the head (AMA 436)", category: "Neck" },
+  { point: "GB-19", pinyin: "", functionText: "Pain of the neck with inability to turn the head (AMA 436)", category: "Neck" },
+  { point: "GB-20", pinyin: "", functionText: "Lockjaw (AMA 437)", category: "Head" },
+  { point: "GB-20", pinyin: "", functionText: "Stiffness of the neck with inability to turn the head (AMA 437)", category: "Neck" },
+  { point: "GB-20", pinyin: "", functionText: "Pain of the neck with inability to turn the head (AMA 437)", category: "Neck" },
+  { point: "GB-20", pinyin: "", functionText: "Pain of the shoulder (AMA 437)", category: "Shoulder" },
+  { point: "GB-20", pinyin: "", functionText: "Pain of the upper back (AMA 437)", category: "Back" },
+  { point: "GB-20", pinyin: "", functionText: "Pain of the lumbar spine (A?? 437)", category: "Back" },
+  { point: "GB-20", pinyin: "", functionText: "Crooked lumbar spine leading to flaccidity (A?? 437)", category: "Back" },
+  { point: "GB-20", pinyin: "", functionText: "Crooked lumbar spine leading to lack of strength in the sinews of the neck (AMA 437)", category: "Neck" },
+  { point: "GB-21", pinyin: "", functionText: "Stiffness of the neck (AMA 438)", category: "Neck" },
+  { point: "GB-21", pinyin: "", functionText: "Pain of the neck (AMA 438)", category: "Neck" },
+  { point: "GB-21", pinyin: "", functionText: "Pain of the shoulder (AMA 438)", category: "Shoulder" },
+  { point: "GB-21", pinyin: "", functionText: "Pain of the back (AMA 438)", category: "Back" },
+  { point: "GB-21", pinyin: "", functionText: "Inability to raise the hand (AMA 438)", category: "Hand" },
+  { point: "GB-21", pinyin: "", functionText: "Inability to raise the arm (AMA 438)", category: "Generalized" },
+  { point: "GB-21", pinyin: "", functionText: "The five taxations (AMA 438)", category: "Generalized" },
+  { point: "GB-21", pinyin: "", functionText: "The seven injuries (AMA 438)", category: "Generalized" },
+  { point: "GB-21", pinyin: "", functionText: "Steaming bone disorder (AMA 438)", category: "Generalized" },
+  { point: "GB-21", pinyin: "", functionText: "Kidney deficiency lumbar pain (AMA 438)", category: "Back" },
+  { point: "GB-23", pinyin: "", functionText: "Pain of the lateral costal region (AMA 441)", category: "Generalized" },
+  { point: "GB-24", pinyin: "", functionText: "Pain of the lateral costal region (AMA 441)", category: "Generalized" },
+  { point: "GB-25", pinyin: "", functionText: "Weakness of the spine (AMA 443)", category: "Back" },
+  { point: "GB-25", pinyin: "", functionText: "Lumbar pain with inability to stand for long (AMA 443)", category: "Back" },
+  { point: "GB-25", pinyin: "", functionText: "Pain of the lateral costal region (AMA 443)", category: "Generalized" },
+  { point: "GB-25", pinyin: "", functionText: "Pain of the back (AMA 443)", category: "Back" },
+  { point: "GB-25", pinyin: "", functionText: "Pain of the inner aspect of the shoulder blade (AMA 443)", category: "Shoulder" },
+  { point: "GB-25", pinyin: "", functionText: "Pain of the hip (AMA 443)", category: "Hips" },
+  { point: "GB-26", pinyin: "", functionText: "Unendurable pain of the lateral costal which radiates to the back (A?? 444)", category: "Generalized" },
+  { point: "GB-26", pinyin: "", functionText: "Pain of the lateral costal region (AMA 444)", category: "Generalized" },
+  { point: "GB-26", pinyin: "", functionText: "Lumbar pain (AMA 444)", category: "Back" },
+  { point: "GB-27", pinyin: "", functionText: "Pain of the back (AMA 445)", category: "Back" },
+  { point: "GB-27", pinyin: "", functionText: "Pain of the lumbar region (AMA 445)", category: "Back" },
+  { point: "GB-27", pinyin: "", functionText: "Pain of the ilium (AMA 445)", category: "Hips" },
+  { point: "GB-28", pinyin: "", functionText: "Pain of the back (AMA 446)", category: "Back" },
+  { point: "GB-28", pinyin: "", functionText: "Pain of the ilium (AMA 446)", category: "Hips" },
+  { point: "GB-29", pinyin: "", functionText: "Pain of the back (A?? 446)", category: "Back" },
+  { point: "GB-29", pinyin: "", functionText: "Pain of the leg (AMA 446)", category: "Legs" },
+  { point: "GB-29", pinyin: "", functionText: "Lumbar pain radiating to the lower abdomen (AMA 446)", category: "Back" },
+  { point: "GB-29", pinyin: "", functionText: "Hip pain radiating to the groin (AMA 446)", category: "Hips" },
+  { point: "GB-29", pinyin: "", functionText: "Weakness of the leg (AMA 446)", category: "Legs" },
+  { point: "GB-29", pinyin: "", functionText: "Paralysis of the leg (AMA 446)", category: "Legs" },
+  { point: "GB-29", pinyin: "", functionText: "Sciatica (AMA 446)", category: "Legs" },
+  { point: "GB-29", pinyin: "", functionText: "Pain of the front of the shoulder radiating to the chest (AMA 446)", category: "Shoulder" },
+  { point: "GB-29", pinyin: "", functionText: "Inability to raise the arm (AMA 446)", category: "Generalized" },
+  { point: "GB-30", pinyin: "", functionText: "Dispels wind-damp (AMA 447)", category: "Generalized" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the buttock (AMA 447)", category: "Hips" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the hip (AMA 447)", category: "Hips" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the leg (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Sprain of the hip (AMA 447)", category: "Hips" },
+  { point: "GB-30", pinyin: "", functionText: "Sprain of the leg (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Sciatica (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Cold-wind-damp painful obstruction (AMA 447)", category: "Generalized" },
+  { point: "GB-30", pinyin: "", functionText: "Numbness of the leg (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Inability to flex the knee (AMA 447)", category: "Knee" },
+  { point: "GB-30", pinyin: "", functionText: "Inability to extend the knee (A?? 447)", category: "Knee" },
+  { point: "GB-30", pinyin: "", functionText: "Contraction of the thigh (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Contraction of the knee (AMA 447)", category: "Knee" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the thigh (AMA 447)", category: "Legs" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the knee (AMA 447)", category: "Knee" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the lumbar region (AMA 447)", category: "Back" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the lateral costal region (AMA 447)", category: "Generalized" },
+  { point: "GB-30", pinyin: "", functionText: "Pain of the leg (AMA 447)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 449)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 449)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Cold painful obstruction (AMA 449)", category: "Generalized" },
+  { point: "GB-31", pinyin: "", functionText: "Sciatica (AMA 449)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Numbness of the leg (AMA 449)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Weakness of the legs (AMA 449)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Feebleness of the legs (AMA 449)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Heavy sensation of the legs with difficulty in sitting (AMA 449)", category: "Legs" },
+  { point: "GB-31", pinyin: "", functionText: "Contraction of the knees (A?? 449)", category: "Knee" },
+  { point: "GB-31", pinyin: "", functionText: "Pain of the knees (AMA 449)", category: "Knee" },
+  { point: "GB-32", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 449)", category: "Legs" },
+  { point: "GB-32", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 449)", category: "Legs" },
+  { point: "GB-32", pinyin: "", functionText: "Sinew painful obstruction with numbness (AMA 449)", category: "Generalized" },
+  { point: "GB-32", pinyin: "", functionText: "Numbness (A?? 449)", category: "Generalized" },
+  { point: "GB-32", pinyin: "", functionText: "Sciatica (AMA 449)", category: "Legs" },
+  { point: "GB-32", pinyin: "", functionText: "Pain of the back (AMA 449)", category: "Back" },
+  { point: "GB-32", pinyin: "", functionText: "Pain of the hip (AMA 449)", category: "Hips" },
+  { point: "GB-33", pinyin: "", functionText: "Benefits the joints (AMA 450)", category: "Generalized" },
+  { point: "GB-33", pinyin: "", functionText: "Dispels wind-damp (AMA 450)", category: "Generalized" },
+  { point: "GB-33", pinyin: "", functionText: "Redness of the lateral aspect of the knee joint (AMA 450)", category: "Knee" },
+  { point: "GB-33", pinyin: "", functionText: "Swelling of the lateral aspect of the knee joint (AMA 450)", category: "Knee" },
+  { point: "GB-33", pinyin: "", functionText: "Pain of the lateral aspect of the knee joint (AMA 450)", category: "Knee" },
+  { point: "GB-33", pinyin: "", functionText: "Inability to flex the knee (AMA 450)", category: "Knee" },
+  { point: "GB-33", pinyin: "", functionText: "Inability to extend the knee (A?? 450)", category: "Knee" },
+  { point: "GB-33", pinyin: "", functionText: "Wind painful obstruction with numbness (AMA 450)", category: "Generalized" },
+  { point: "GB-33", pinyin: "", functionText: "Painful obstruction of the lower leg (AMA 450)", category: "Legs" },
+  { point: "GB-33", pinyin: "", functionText: "Numbness of the lower leg (AMA 450)", category: "Legs" },
+  { point: "GB-33", pinyin: "", functionText: "Leg qi (AMA 450)", category: "Legs" },
+  { point: "GB-34", pinyin: "", functionText: "Benefits the lateral costal region (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Disorders of the sinews (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Contraction of the sinews (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Contraction of the calf muscles in sudden turmoil disorder (AMA 451)", category: "Legs" },
+  { point: "GB-34", pinyin: "", functionText: "Pain of the calf muscles in sudden turmoil disorder (AMA 451)", category: "Legs" },
+  { point: "GB-34", pinyin: "", functionText: "Contraction of the sinews of the foot (AMA 451)", category: "Foot" },
+  { point: "GB-34", pinyin: "", functionText: "Stiffness of the muscles (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Tightness of the muscles (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Stiffness of the joints (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Tightness of the joints (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Numbness (A?? 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Stiffness of the neck (AMA 451)", category: "Neck" },
+  { point: "GB-34", pinyin: "", functionText: "Stiffness of the shoulders (AMA 451)", category: "Shoulder" },
+  { point: "GB-34", pinyin: "", functionText: "Pain of the elbow (AMA 451)", category: "Elbow" },
+  { point: "GB-34", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 451)", category: "Legs" },
+  { point: "GB-34", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 451)", category: "Legs" },
+  { point: "GB-34", pinyin: "", functionText: "Swelling of the knee (AMA 451)", category: "Knee" },
+  { point: "GB-34", pinyin: "", functionText: "Pain of the knee (AMA 451)", category: "Knee" },
+  { point: "GB-34", pinyin: "", functionText: "Redness of the knee (AMA 451)", category: "Knee" },
+  { point: "GB-34", pinyin: "", functionText: "Cold painful obstruction of the hip (AMA 451)", category: "Hips" },
+  { point: "GB-34", pinyin: "", functionText: "Cold painful obstruction of the knee (AMA 451)", category: "Knee" },
+  { point: "GB-34", pinyin: "", functionText: "Coldness of the feet (AMA 451)", category: "Foot" },
+  { point: "GB-34", pinyin: "", functionText: "Fullness of the lateral costal region (AMA 451)", category: "Generalized" },
+  { point: "GB-34", pinyin: "", functionText: "Pain of the lateral costal region (AMA 451)", category: "Generalized" },
+  { point: "GB-35", pinyin: "", functionText: "Swelling of the knee (AMA 453)", category: "Knee" },
+  { point: "GB-35", pinyin: "", functionText: "Pain of the knee (AMA 453)", category: "Knee" },
+  { point: "GB-35", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 453)", category: "Legs" },
+  { point: "GB-35", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 453)", category: "Legs" },
+  { point: "GB-35", pinyin: "", functionText: "Cold painful obstruction (AMA 453)", category: "Generalized" },
+  { point: "GB-35", pinyin: "", functionText: "Contraction of the sinews in sudden turmoil disorder (AMA 453)", category: "Generalized" },
+  { point: "GB-35", pinyin: "", functionText: "Pain of the lateral costal region (AMA 453)", category: "Generalized" },
+  { point: "GB-36", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 454)", category: "Legs" },
+  { point: "GB-36", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 454)", category: "Legs" },
+  { point: "GB-36", pinyin: "", functionText: "Pain of the skin (AMA 454)", category: "Generalized" },
+  { point: "GB-36", pinyin: "", functionText: "Cold damp leg qi (AMA 454)", category: "Legs" },
+  { point: "GB-36", pinyin: "", functionText: "Cold sensation of the nape (AMA 454)", category: "Neck" },
+  { point: "GB-36", pinyin: "", functionText: "Cold sensation of the neck (??? 454)", category: "Neck" },
+  { point: "GB-36", pinyin: "", functionText: "Stiffness of the nape (AMA 454)", category: "Neck" },
+  { point: "GB-36", pinyin: "", functionText: "Stiffness of the neck (AMA 454)", category: "Neck" },
+  { point: "GB-36", pinyin: "", functionText: "Pain of the nape (AMA 454)", category: "Neck" },
+  { point: "GB-36", pinyin: "", functionText: "Pain of the neck (AMA 454)", category: "Neck" },
+  { point: "GB-37", pinyin: "", functionText: "Knee pain (AMA 454)", category: "Knee" },
+  { point: "GB-37", pinyin: "", functionText: "Pain of the lower legs with inability to stand for long (AMA 454)", category: "Legs" },
+  { point: "GB-37", pinyin: "", functionText: "Atrophy disorder of the lefs with difficulty in standing agter sitting (AMA 454)", category: "Legs" },
+  { point: "GB-37", pinyin: "", functionText: "Atrophy disorder of the lower limb with numbness (AMA 454)", category: "Legs" },
+  { point: "GB-37", pinyin: "", functionText: "Painful obstruction of the lower limb with numbness (A?? 454)", category: "Legs" },
+  { point: "GB-37", pinyin: "", functionText: "Numbness of the body (AMA 454)", category: "Generalized" },
+  { point: "GB-37", pinyin: "", functionText: "Pain of the lower leg (AMA 454)", category: "Legs" },
+  { point: "GB-38", pinyin: "", functionText: "Pain of the lateral costal region (AMA 456)", category: "Generalized" },
+  { point: "GB-38", pinyin: "", functionText: "Pain in the middle of the supraclavicular fossa (AMA 456)", category: "Shoulder" },
+  { point: "GB-38", pinyin: "", functionText: "Wind painful obstruction with numbness (AMA 456)", category: "Generalized" },
+  { point: "GB-38", pinyin: "", functionText: "Wandering pain of the joints (AMA 456)", category: "Generalized" },
+  { point: "GB-38", pinyin: "", functionText: "Contracted sinews (AMA 456)", category: "Generalized" },
+  { point: "GB-38", pinyin: "", functionText: "Pain of the hundred joints (AMA 456)", category: "Generalized" },
+  { point: "GB-38", pinyin: "", functionText: "Pain of the lateral leg(AMA 456)", category: "Legs" },
+  { point: "GB-39", pinyin: "", functionText: "Stiffness of the neck (AMA 457)", category: "Neck" },
+  { point: "GB-39", pinyin: "", functionText: "Pain of the neck (AMA 457)", category: "Neck" },
+  { point: "GB-39", pinyin: "", functionText: "Atrophy disorder (AMA 457)", category: "Generalized" },
+  { point: "GB-39", pinyin: "", functionText: "Chronic painful obstruction (AMA 457)", category: "Generalized" },
+  { point: "GB-39", pinyin: "", functionText: "Wind-taxation (AMA 457)", category: "Generalized" },
+  { point: "GB-39", pinyin: "", functionText: "Contracted sinews (AMA 457)", category: "Generalized" },
+  { point: "GB-39", pinyin: "", functionText: "Pain of the bones (AMA 457)", category: "Generalized" },
+  { point: "GB-39", pinyin: "", functionText: "Hip pain (AMA 457)", category: "Hips" },
+  { point: "GB-39", pinyin: "", functionText: "Numbness of the knee (AMA 457)", category: "Knee" },
+  { point: "GB-39", pinyin: "", functionText: "Numbness of the lower leg (AMA 457)", category: "Legs" },
+  { point: "GB-39", pinyin: "", functionText: "Pain of the knee (AMA 457)", category: "Knee" },
+  { point: "GB-39", pinyin: "", functionText: "Pain of the lower leg (AMA 457)", category: "Legs" },
+  { point: "GB-39", pinyin: "", functionText: "Leg qi (AMA 457)", category: "Legs" },
+  { point: "GB-39", pinyin: "", functionText: "Sprain of the ankle joint (AMA 457)", category: "Ankle" },
+  { point: "GB-39", pinyin: "", functionText: "Flaccidity of the foot (AMA 457)", category: "Foot" },
+  { point: "GB-39", pinyin: "", functionText: "Pain of the lateral costal region (AMA 457)", category: "Generalized" },
+  { point: "GB-40", pinyin: "", functionText: "Pain of the chest with inability to catch the breath (AMA 458)", category: "Generalized" },
+  { point: "GB-40", pinyin: "", functionText: "Pain of the lateral costal region with inability to catch the breath (AMA 458)", category: "Generalized" },
+  { point: "GB-40", pinyin: "", functionText: "Paralysis of the lumbar spine (AMA 459)", category: "Back" },
+  { point: "GB-40", pinyin: "", functionText: "Pain of the lumbar spine (AMA 459)", category: "Back" },
+  { point: "GB-40", pinyin: "", functionText: "Pain of the hip (AMA 459)", category: "Hips" },
+  { point: "GB-40", pinyin: "", functionText: "Atrophy disorder of the lower limb (AMA 459)", category: "Legs" },
+  { point: "GB-40", pinyin: "", functionText: "Painful obstruction of the lower limb (AMA 459)", category: "Legs" },
+  { point: "GB-40", pinyin: "", functionText: "Cramping of the legs (AMA 459)", category: "Legs" },
+  { point: "GB-40", pinyin: "", functionText: "Pain of the legs (AMA 459)", category: "Legs" },
+  { point: "GB-40", pinyin: "", functionText: "Sciatica (AMA 459)", category: "Legs" },
+  { point: "GB-40", pinyin: "", functionText: "Pain of the lower leg (AMA 459)", category: "Legs" },
+  { point: "GB-40", pinyin: "", functionText: "Drop foot (AMA 459)", category: "Foot" },
+  { point: "GB-40", pinyin: "", functionText: "Flaccidity of the ankle (AMA 459)", category: "Ankle" },
+  { point: "GB-40", pinyin: "", functionText: "Swelling of the lateral ankle (AMA 459)", category: "Ankle" },
+  { point: "GB-40", pinyin: "", functionText: "Pain of the wrist (AMA 459)", category: "Wrist" },
+  { point: "GB-41", pinyin: "", functionText: "Pain of the hip (AMA 460)", category: "Hips" },
+  { point: "GB-41", pinyin: "", functionText: "Pain of the lower leg (AMA 460)", category: "Legs" },
+  { point: "GB-41", pinyin: "", functionText: "Fixed painful obstruction (AMA 460)", category: "Generalized" },
+  { point: "GB-41", pinyin: "", functionText: "Wandering pain (AMA 460)", category: "Generalized" },
+  { point: "GB-41", pinyin: "", functionText: "Swelling of the feet (AMA 460)", category: "Foot" },
+  { point: "GB-41", pinyin: "", functionText: "Pain of the feet (AMA 460)", category: "Foot" },
+  { point: "GB-41", pinyin: "", functionText: "Pain of the toes (AMA 460)", category: "Toes" },
+  { point: "GB-41", pinyin: "", functionText: "Contraction of the toes (AMA 460)", category: "Toes" },
+  { point: "GB-41", pinyin: "", functionText: "Swelling of the dorsum of the feet (AMA 460)", category: "Foot" },
+  { point: "GB-41", pinyin: "", functionText: "Pain of the dorsum of the feet (AMA 460)", category: "Foot" },
+  { point: "GB-41", pinyin: "", functionText: "All disorders of the feet (AMA 460)", category: "Foot" },
+  { point: "GB-42", pinyin: "", functionText: "Swelling of the dorsum of the foot (AMA 462)", category: "Foot" },
+  { point: "GB-42", pinyin: "", functionText: "Redness of the dorsum of the foot (AMA 462)", category: "Foot" },
+  { point: "GB-42", pinyin: "", functionText: "Pain of the dorsum of the foot (AMA 462)", category: "Foot" },
+  { point: "GB-42", pinyin: "", functionText: "Lumbar pain (AMA 462)", category: "Back" },
+  { point: "GB-43", pinyin: "", functionText: "Pain of the submandibular region (AMA 462)", category: "Head" },
+  { point: "GB-43", pinyin: "", functionText: "Swelling of the four limbs (AMA 463)", category: "Generalized" },
+  { point: "GB-43", pinyin: "", functionText: "Pain of the whole body (AMA 463)", category: "Generalized" },
+  { point: "GB-43", pinyin: "", functionText: "Wandering pain (AMA 463)", category: "Generalized" },
+  { point: "GB-43", pinyin: "", functionText: "Pain of the knee (AMA 463)", category: "Knee" },
+  { point: "GB-43", pinyin: "", functionText: "Pain of the thigh (AMA 463)", category: "Legs" },
+  { point: "GB-43", pinyin: "", functionText: "Swelling of the lateral aspect of the knee (AM?? 463)", category: "Knee" },
+  { point: "GB-43", pinyin: "", functionText: "Pain of the lateral aspect of the knee (AMA 463)", category: "Knee" },
+  { point: "GB-43", pinyin: "", functionText: "Redness of the dorsum of the foot (AMA 463)", category: "Foot" },
+  { point: "GB-43", pinyin: "", functionText: "Swelling of the dorsum of the foot (AMA 463)", category: "Foot" },
+  { point: "GB-43", pinyin: "", functionText: "Pain of the dorsum of the foot (AMA 463)", category: "Foot" },
+  { point: "GB-43", pinyin: "", functionText: "Contraction of the five toes (AMA 463)", category: "Toes" },
+  { point: "GB-44", pinyin: "", functionText: "Pain of the lateral costal region (AMA 464)", category: "Generalized" },
+  { point: "GB-44", pinyin: "", functionText: "Pain of the lateral costal region with inability to catch breath (AMA 464)", category: "Generalized" },
+  { point: "GB-44", pinyin: "", functionText: "Pain of the lateral costal region with inability to cough (AMA 464)", category: "Generalized" },
+  { point: "GB-44", pinyin: "", functionText: "Contracted sinews (AMA 464)", category: "Generalized" },
+  { point: "GB-44", pinyin: "", functionText: "Contraction of the sinews of the four limbs (AMA 464)", category: "Generalized" },
+  { point: "GB-44", pinyin: "", functionText: "Inability to raise the elbow (AMA 464)", category: "Elbow" },
+  { point: "LR-1", pinyin: "", functionText: "Tetany (AMA 473)", category: "Generalized" },
+  { point: "LR-2", pinyin: "", functionText: "Tetany (??? 475)", category: "Generalized" },
+  { point: "LR-2", pinyin: "", functionText: "Pain of the lateral costal region (AMA 475)", category: "Generalized" },
+  { point: "LR-2", pinyin: "", functionText: "Pain of the back (AMA 475)", category: "Back" },
+  { point: "LR-2", pinyin: "", functionText: "Pain below the Heart (AMA 475)", category: "Generalized" },
+  { point: "LR-2", pinyin: "", functionText: "Lumbar pain with difficulty in flexing the back (AMA 475)", category: "Back" },
+  { point: "LR-2", pinyin: "", functionText: "Lumbar pain with difficulty in extending the back (AMA 475)", category: "Back" },
+  { point: "LR-2", pinyin: "", functionText: "Swelling of the knee (AMA 475)", category: "Knee" },
+  { point: "LR-2", pinyin: "", functionText: "Pain of the inner aspect of the leg (AMA 475)", category: "Legs" },
+  { point: "LR-2", pinyin: "", functionText: "Heat in the shin (AMA 475)", category: "Legs" },
+  { point: "LR-2", pinyin: "", functionText: "Leg qi with redness (AMA 475)", category: "Legs" },
+  { point: "LR-2", pinyin: "", functionText: "Leg qi with swelling (AMA 475)", category: "Legs" },
+  { point: "LR-2", pinyin: "", functionText: "Pain of the instep (AMA 475)", category: "Foot" },
+  { point: "LR-2", pinyin: "", functionText: "Swelling of the instep (AMA 475)", category: "Foot" },
+  { point: "LR-3", pinyin: "", functionText: "Contraction of the sinews of the hands (AMA 477)", category: "Hand" },
+  { point: "LR-3", pinyin: "", functionText: "Contraction of the sinews of the feet (AMA 477)", category: "Foot" },
+  { point: "LR-3", pinyin: "", functionText: "Tetany (AMA 477)", category: "Generalized" },
+  { point: "LR-3", pinyin: "", functionText: "Pain of the lateral costal region (AMA 477)", category: "Generalized" },
+  { point: "LR-3", pinyin: "", functionText: "Lumbar pain radiating to the lower abdomen (AMA 478)", category: "Back" },
+  { point: "LR-3", pinyin: "", functionText: "Lumbar pain (AMA 478)", category: "Back" },
+  { point: "LR-3", pinyin: "", functionText: "Pain of the inner knee (AMA 478)", category: "Knee" },
+  { point: "LR-3", pinyin: "", functionText: "Pain of the outer knee (AMA 478)", category: "Knee" },
+  { point: "LR-3", pinyin: "", functionText: "Pain of the lower leg (AMA 478)", category: "Legs" },
+  { point: "LR-3", pinyin: "", functionText: "Flaccidity of the legs (AMA 478)", category: "Legs" },
+  { point: "LR-3", pinyin: "", functionText: "Weakness of the legs (AMA 478)", category: "Legs" },
+  { point: "LR-3", pinyin: "", functionText: "Inability to walk (AMA 478)", category: "Legs" },
+  { point: "LR-3", pinyin: "", functionText: "Cold sensation in the knees (AMA 478)", category: "Knee" },
+  { point: "LR-3", pinyin: "", functionText: "Cold sensation in the feet (A?? 478)", category: "Foot" },
+  { point: "LR-3", pinyin: "", functionText: "Cold feet (AMA 478)", category: "Foot" },
+  { point: "LR-3", pinyin: "", functionText: "Pain of the inner malleolus (AMA 478)", category: "Ankle" },
+  { point: "LR-3", pinyin: "", functionText: "Swelling of the elbow (AMA 478)", category: "Elbow" },
+  { point: "LR-3", pinyin: "", functionText: "Contraction of the five fingers (AMA 478)", category: "Finger" },
+  { point: "LR-4", pinyin: "", functionText: "Lumbar pain (AMA 481)", category: "Back" },
+  { point: "LR-4", pinyin: "", functionText: "Contracted sinews (AMA 481)", category: "Generalized" },
+  { point: "LR-4", pinyin: "", functionText: "Numbness of the body (AMA 481)", category: "Generalized" },
+  { point: "LR-4", pinyin: "", functionText: "Heaviness of the body pain of the medial aspect of the knee (A?? 481)", category: "Knee" },
+  { point: "LR-4", pinyin: "", functionText: "Cold inversion of the feet (AMA 481)", category: "Foot" },
+  { point: "LR-4", pinyin: "", functionText: "Pain of the medial malleolus (AMA 481)", category: "Ankle" },
+  { point: "LR-4", pinyin: "", functionText: "Swelling of the medial malleolus (AMA 481)", category: "Ankle" },
+  { point: "LR-5", pinyin: "", functionText: "Inflexibility of the back with inability to turn (AMA 482)", category: "Back" },
+  { point: "LR-5", pinyin: "", functionText: "Lumbar pain (AMA 482)", category: "Back" },
+  { point: "LR-5", pinyin: "", functionText: "Cold of the feet (AMA 482)", category: "Foot" },
+  { point: "LR-5", pinyin: "", functionText: "Cold of the lower leg (AMA 482)", category: "Legs" },
+  { point: "LR-5", pinyin: "", functionText: "Pain of the feet (AMA 482)", category: "Foot" },
+  { point: "LR-5", pinyin: "", functionText: "Pain of the lower leg (AMA 482)", category: "Legs" },
+  { point: "LR-6", pinyin: "", functionText: "Damp painful obstruction with inability to walk (AMA 484)", category: "Generalized" },
+  { point: "LR-6", pinyin: "", functionText: "Flacifity of the legs (AMA 484)", category: "Legs" },
+  { point: "LR-6", pinyin: "", functionText: "Emaciation of the legs (AMA 484)", category: "Legs" },
+  { point: "LR-6", pinyin: "", functionText: "Numbness of the body (AMA 484)", category: "Generalized" },
+  { point: "LR-6", pinyin: "", functionText: "Numbness of the hands (AMA 484)", category: "Hand" },
+  { point: "LR-6", pinyin: "", functionText: "Numbness of the feet (AMA 484)", category: "Foot" },
+  { point: "LR-6", pinyin: "", functionText: "Cold sensation of the lower legs with inability to stand for long (AMA 484)", category: "Legs" },
+  { point: "LR-7", pinyin: "", functionText: "Swelling of the knee (AMA 484)", category: "Knee" },
+  { point: "LR-7", pinyin: "", functionText: "Pain of the knee (AMA 484)", category: "Knee" },
+  { point: "LR-7", pinyin: "", functionText: "Pain of the inner aspect of the knee radiating to the patella (AMA 484)", category: "Knee" },
+  { point: "LR-7", pinyin: "", functionText: "Crane's knee wind (AMA 484)", category: "Knee" },
+  { point: "LR-7", pinyin: "", functionText: "Wind painful obstruction (AMA 484)", category: "Generalized" },
+  { point: "LR-7", pinyin: "", functionText: "White tiger joint wind pain (A?? 484)", category: "Knee" },
+  { point: "LR-7", pinyin: "", functionText: "Difficulty in flexing the knee (AMA 484)", category: "Knee" },
+  { point: "LR-7", pinyin: "", functionText: "Difficulty in extending the knee (AMA 484)", category: "Knee" },
+  { point: "LR-8", pinyin: "", functionText: "Pain of the lateral costal region (AMA 485)", category: "Generalized" },
+  { point: "LR-8", pinyin: "", functionText: "Knee pain (A?? 485)", category: "Knee" },
+  { point: "LR-8", pinyin: "", functionText: "Swelling of the patella (AMA 485)", category: "Knee" },
+  { point: "LR-8", pinyin: "", functionText: "Pain of the patella (AMA 485)", category: "Knee" },
+  { point: "LR-8", pinyin: "", functionText: "Coldness of the knee (AMA 485)", category: "Knee" },
+  { point: "LR-8", pinyin: "", functionText: "Coldness of the lower leg (A?? 485)", category: "Legs" },
+  { point: "LR-8", pinyin: "", functionText: "Pain of the knee (AMA 485)", category: "Knee" },
+  { point: "LR-8", pinyin: "", functionText: "Pain of the lower leg (AMA 485)", category: "Legs" },
+  { point: "LR-8", pinyin: "", functionText: "Pain of the inner thigh (AMA 485)", category: "Legs" },
+  { point: "LR-8", pinyin: "", functionText: "Extreme pain of the body (A?? 485)", category: "Generalized" },
+  { point: "LR-9", pinyin: "", functionText: "Lumbo-sacral pain extending to the lower abdomen (AMA 487)", category: "Back" },
+  { point: "LR-11", pinyin: "", functionText: "Pain in the inner thigh (AMA 487)", category: "Legs" },
+  { point: "LR-11", pinyin: "", functionText: "Pain in the knee (AMA 487)", category: "Knee" },
+  { point: "LR-12", pinyin: "", functionText: "Pain in the inner thigh (AMA 487)", category: "Legs" },
+  { point: "LR-12", pinyin: "", functionText: "Pain in the knee (AMA 487)", category: "Knee" },
+  { point: "LR-13", pinyin: "", functionText: "Pain of the ribs (AMA 489)", category: "Generalized" },
+  { point: "LR-13", pinyin: "", functionText: "Cold of the lumbar spine (A?? 489)", category: "Back" },
+  { point: "LR-13", pinyin: "", functionText: "Pain of the lumbar spine (AMA 489)", category: "Back" },
+  { point: "LR-13", pinyin: "", functionText: "Rigidity of the spine (AMA 489)", category: "Back" },
+  { point: "LR-13", pinyin: "", functionText: "Lumbar pain with inability to turn at the waist (AMA 489)", category: "Back" },
+  { point: "LR-13", pinyin: "", functionText: "Lumbar pain with inability to bend at the waist (AMA 489)", category: "Back" },
+  { point: "LR-13", pinyin: "", functionText: "Inability to raise the arm (AMA 489)", category: "Generalized" },
+  { point: "LR-13", pinyin: "", functionText: "Inability to raise the shoulder (AMA 489)", category: "Shoulder" },
+  { point: "LR-14", pinyin: "", functionText: "Tetany (AMA 491)", category: "Generalized" },
+  { point: "LR-14", pinyin: "", functionText: "Stiffness of the head (AMA 491)", category: "Head" },
+  { point: "LR-14", pinyin: "", functionText: "Stiffness of the neck (AMA 491)", category: "Neck" },
+  { point: "LR-14", pinyin: "", functionText: "Pain of the head (AMA 491)", category: "Head" },
+  { point: "LR-14", pinyin: "", functionText: "Pain of the neck (AMA 491)", category: "Neck" },
+];
 
-    const pointsData = [
-      {
-        code: "LU-2",
-        name: "Yunmen (Cloud Gate)",
-        channel: "Lung",
-        functions: [
-          "Clears Lung heat",
-          "Disseminates Lung qi",
-          "Descends Lung qi",
-          "Dispels agitation and fullness in the chest",
-          "Relieves cough, wheezing, asthma",
-          "Dyspnoea with inability to lie down",
-          "Oppressive or painful sensation in the chest",
-          "Pain of the shoulders and supraclavicular fossa",
-          "Throat painful obstruction",
-          "Goitre"
-        ]
-      },
-      {
-        code: "LU-3",
-        name: "Tianfu (Palace of Heaven)",
-        channel: "Lung",
-        functions: [
-          "Clears Lung heat",
-          "Descends Lung qi",
-          "Cools blood and stops bleeding",
-          "Calms the corporeal soul (po)",
-          "Cough, wheezing, dyspnoea",
-          "Nosebleed, spitting or coughing blood",
-          "Somnolence or insomnia",
-          "Sadness, weeping, disorientation, forgetfulness",
-          "Goitre, swelling of the throat",
-          "Pain of the antero-lateral aspect of the upper arm",
-          "Dizziness and visual dizziness"
-        ]
-      },
-      {
-        code: "LU-5",
-        name: "Chize (Cubit Marsh)",
-        channel: "Lung",
-        functions: [
-          "Clears heat from the Lung",
-          "Descends rebellious qi",
-          "Regulates the water passages",
-          "Activates the channel and relaxes the sinews",
-          "Alleviates pain",
-          "Cough, coughing phlegm, wheezing, asthma, dyspnoea",
-          "Fullness or agitation of the chest",
-          "Tidal or taxation fever, malaria",
-          "Dry mouth, dry tongue, throat painful obstruction",
-          "Spitting, coughing or vomiting blood",
-          "Diarrhoea and abdominal distention",
-          "Swelling of the four limbs, enuresis, frequent urination",
-          "Shoulder and elbow pain, inability to raise the arm",
-          "Lumbar pain, knee swelling and pain"
-        ]
-      },
-      {
-        code: "LU-7",
-        name: "Lieque (Broken Sequence)",
-        channel: "Lung",
-        functions: [
-          "Releases the exterior and expels wind",
-          "Promotes the descending function of the Lung",
-          "Pacifies wind and phlegm",
-          "Benefits the head and nape",
-          "Opens and regulates the Conception vessel",
-          "Regulates the water passages",
-          "Activates the channel and alleviates pain",
-          "Chills and fever, exterior wind-cold",
-          "Nasal congestion, discharge, polyps, flaring nostrils",
-          "Throat painful obstruction",
-          "Cough, phlegm, wheezing, dyspnoea, asthma, diminished qi",
-          "Headache, stiffness of neck and nape, lockjaw",
-          "Hemiplegia, deviation of the mouth and eye",
-          "Hypertension",
-          "Urinary and genital disorders such as hot or painful urination"
-        ]
-      },
-      {
-        code: "LU-9",
-        name: "Taiyuan (Supreme Abyss)",
-        channel: "Lung",
-        functions: [
-          "Tonifies the Lung",
-          "Transforms phlegm",
-          "Promotes the descending function of the Lung",
-          "Regulates and harmonises the one hundred vessels",
-          "Cough with watery phlegm, asthma, wheezing, dyspnoea",
-          "Oppression and agitation of the chest with difficult breathing",
-          "Spitting, coughing or vomiting blood",
-          "Rebellion of Stomach qi, belching",
-          "Head wind, swelling of the face",
-          "Pain and weakness of the wrist, shoulder, back and inner arm"
-        ]
-      },
-      {
-        code: "LU-11",
-        name: "Shaoshang (Lesser Shang)",
-        channel: "Lung",
-        functions: [
-          "Revives consciousness",
-          "Clears heat and benefits the throat",
-          "Loss of consciousness from windstroke",
-          "Cold or hot inversion",
-          "Severe sore throat, throat painful obstruction",
-          "Nosebleed, dry lips with desire to drink",
-          "Febrile disease with cold shivering",
-          "Agitation of the Heart with cough or dyspnoea",
-          "Mania and childhood fright wind",
-          "Pain or contraction of the thumb and wrist"
-        ]
-      },
-      {
-        code: "LI-4",
-        name: "Hegu (Joining Valley)",
-        channel: "Large Intestine",
-        functions: [
-          "Regulates the defensive qi and adjusts sweating",
-          "Expels wind and releases the exterior",
-          "Regulates the face, eyes, nose, mouth and ears",
-          "Activates the channel and alleviates pain",
-          "Induces labour",
-          "Restores the yang",
-          "Chills and fever, exterior wind-cold pattern",
-          "Headache (one-sided or whole head), hypertension",
-          "Eye disorders, nosebleed, rhinitis, sneezing",
-          "Toothache, mouth ulcers, tongue rigidity, mumps, loss of voice",
-          "Facial swelling, deviation of the mouth, lockjaw",
-          "Dysenteric disorder, childhood nutritional impairment",
-          "Wind rash, malaria, mania",
-          "Painful obstruction or atrophy of the four limbs, hemiplegia",
-          "Pain of the arm, bones, sinews and lumbar spine"
-        ]
-      },
-      {
-        code: "ST-25",
-        name: "Tianshu (Heaven’s Pivot)",
-        channel: "Stomach",
-        functions: [
-          "Regulates the intestines, Spleen and Stomach",
-          "Resolves dampness and damp-heat",
-          "Regulates qi and blood and eliminates stagnation",
-          "Diarrhoea, dysenteric disorder, borborygmus",
-          "Constipation, drum distention, abdominal swelling",
-          "Turbid painful urinary dysfunction, oedema",
-          "Vomiting, retching, difficult ingestion, poor appetite",
-          "Sudden turmoil disorder with abdominal pain",
-          "Intestinal abscess",
-          "Abdominal masses, uterine pain, dysmenorrhoea, irregular menstruation, infertility",
-          "Red or white leucorrhoea",
-          "Cold shivering from malaria, severe heat with manic raving"
-        ]
-      }
-      // 👉 Add more points here using the same structure.
-    ];
-
-    // -----------------------------------------
-    // HELPER: Build a map from code -> point object
-    // -----------------------------------------
-    const pointMap = {};
-    pointsData.forEach((pt) => {
-      pointMap[pt.code] = pt;
-    });
-
-    // -----------------------------------------
-    // DOM ELEMENTS
-    // -----------------------------------------
-    const functionInput = document.getElementById("functionInput");
-    const functionResults = document.getElementById("functionResults");
-    const functionSearchBtn = document.getElementById("functionSearchBtn");
-    const functionClearBtn = document.getElementById("functionClearBtn");
-
-    const pointSelect = document.getElementById("pointSelect");
-    const pointShowBtn = document.getElementById("pointShowBtn");
-    const pointResults = document.getElementById("pointResults");
-
-    // -----------------------------------------
-    // INITIALISE POINT DROPDOWN
-    // -----------------------------------------
-    function populatePointSelect() {
-      const sorted = [...pointsData].sort((a, b) =>
-        a.code.localeCompare(b.code, "en", { numeric: true })
-      );
-      for (const pt of sorted) {
-        const option = document.createElement("option");
-        option.value = pt.code;
-        option.textContent = `${pt.code} — ${pt.name}`;
-        pointSelect.appendChild(option);
-      }
-    }
-
-    populatePointSelect();
-
-    // -----------------------------------------
-    // SEARCH BY FUNCTION
-    // -----------------------------------------
     function highlightMatch(text, query) {
       if (!query) return text;
-      const regex = new RegExp("(" + query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp("(" + escaped + ")", "ig");
       return text.replace(regex, "<span class='highlight'>$1</span>");
     }
 
-    function searchByFunction() {
-      const raw = functionInput.value.trim();
-      functionResults.innerHTML = "";
-      const q = raw.toLowerCase();
-
-      if (!q) {
-        functionResults.innerHTML =
-          "<div class='result-empty'>Type a keyword like <em>cough</em>, <em>insomnia</em>, <em>clears heat</em>, etc.</div>";
-        return;
-      }
-
-      const matches = [];
-
-      for (const pt of pointsData) {
-        const matchedFunctions = pt.functions.filter((fn) =>
-          fn.toLowerCase().includes(q)
-        );
-        if (matchedFunctions.length) {
-          matches.push({ point: pt, functions: matchedFunctions });
+    function groupByPoint(subset) {
+      const map = new Map();
+      subset.forEach((row) => {
+        if (!map.has(row.point)) {
+          map.set(row.point, {
+            point: row.point,
+            pinyin: row.pinyin,
+            items: []
+          });
         }
-      }
+        map.get(row.point).items.push(row);
+      });
+      return Array.from(map.values()).sort((a, b) =>
+        a.point.localeCompare(b.point, "en", { numeric: true })
+      );
+    }
 
-      if (!matches.length) {
-        functionResults.innerHTML =
-          "<div class='result-empty'>No points found with that function text. Try another keyword or shorter phrase.</div>";
-        return;
-      }
+    function renderPointGroups(groups, targetEl, options = {}) {
+      const { query = "", selectedCategory = null, showCount = true } = options;
 
-      for (const entry of matches) {
+      groups.forEach((group) => {
         const wrapper = document.createElement("div");
         wrapper.className = "point-card";
 
@@ -541,120 +1773,202 @@
         const left = document.createElement("div");
         const nameEl = document.createElement("div");
         nameEl.className = "point-name";
-        nameEl.textContent = `${entry.point.code} — ${entry.point.name}`;
+        nameEl.textContent =
+          group.point + (group.pinyin ? " — " + group.pinyin : "");
 
         const channelEl = document.createElement("div");
         channelEl.className = "point-channel";
-        channelEl.textContent = entry.point.channel + " channel";
+        channelEl.textContent = "Point: " + group.point;
 
         left.appendChild(nameEl);
         left.appendChild(channelEl);
-
-        const right = document.createElement("div");
-        right.className = "badge-count";
-        right.textContent = `${entry.functions.length} matching function(s)`;
-
         header.appendChild(left);
-        header.appendChild(right);
+
+        if (showCount) {
+          const right = document.createElement("div");
+          right.className = "badge-count";
+          right.textContent = group.items.length + " function(s)";
+          header.appendChild(right);
+        }
+
         wrapper.appendChild(header);
 
         const ul = document.createElement("ul");
         ul.className = "function-list";
 
-        entry.functions.forEach((fn) => {
+        group.items.forEach((row) => {
           const li = document.createElement("li");
-          li.innerHTML = highlightMatch(fn, raw);
+          const line = document.createElement("div");
+          line.className = "fn-line";
+
+          const textSpan = document.createElement("span");
+          textSpan.className = "fn-text";
+          textSpan.innerHTML = query
+            ? highlightMatch(row.functionText, query)
+            : row.functionText;
+          line.appendChild(textSpan);
+
+          if (row.category) {
+            const pill = document.createElement("span");
+            pill.className = "pill category";
+            if (selectedCategory && row.category === selectedCategory) {
+              pill.classList.add("selected");
+            }
+            pill.textContent = row.category;
+            line.appendChild(pill);
+          }
+
+          li.appendChild(line);
           ul.appendChild(li);
         });
 
         wrapper.appendChild(ul);
-        functionResults.appendChild(wrapper);
-      }
+        targetEl.appendChild(wrapper);
+      });
     }
 
-    function clearFunctionSearch() {
-      functionInput.value = "";
-      functionResults.innerHTML =
-        "<div class='result-empty'>Cleared. Enter a function keyword to search again.</div>";
-      functionInput.focus();
-    }
+    document.addEventListener("DOMContentLoaded", () => {
+      const functionInput = document.getElementById("functionInput");
+      const functionResults = document.getElementById("functionResults");
+      const functionSearchBtn = document.getElementById("functionSearchBtn");
+      const functionClearBtn = document.getElementById("functionClearBtn");
 
-    functionSearchBtn.addEventListener("click", searchByFunction);
-    functionClearBtn.addEventListener("click", clearFunctionSearch);
+      const pointSelect = document.getElementById("pointSelect");
+      const pointShowBtn = document.getElementById("pointShowBtn");
+      const pointResults = document.getElementById("pointResults");
 
-    functionInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        searchByFunction();
-      }
-    });
+      const categorySelect = document.getElementById("categorySelect");
+      const categorySearchBtn = document.getElementById("categorySearchBtn");
+      const categoryClearBtn = document.getElementById("categoryClearBtn");
+      const categoryResults = document.getElementById("categoryResults");
 
-    // -----------------------------------------
-    // SEARCH BY POINT
-    // -----------------------------------------
-    function showPointFunctions() {
-      const code = pointSelect.value;
-      pointResults.innerHTML = "";
+      const uniquePoints = Array.from(
+        new Map(rows.map((r) => [r.point, r.pinyin])).entries()
+      ).sort((a, b) => a[0].localeCompare(b[0], "en", { numeric: true }));
 
-      if (!code) {
-        pointResults.innerHTML =
-          "<div class='result-empty'>Choose a point above to see its functions.</div>";
-        return;
-      }
-
-      const pt = pointMap[code];
-      if (!pt) {
-        pointResults.innerHTML =
-          "<div class='result-empty'>Point not found in the dataset.</div>";
-        return;
-      }
-
-      const wrapper = document.createElement("div");
-      wrapper.className = "point-card";
-
-      const header = document.createElement("div");
-      header.className = "point-header";
-
-      const left = document.createElement("div");
-      const nameEl = document.createElement("div");
-      nameEl.className = "point-name";
-      nameEl.textContent = `${pt.code} — ${pt.name}`;
-
-      const channelEl = document.createElement("div");
-      channelEl.className = "point-channel";
-      channelEl.textContent = pt.channel + " channel";
-
-      left.appendChild(nameEl);
-      left.appendChild(channelEl);
-
-      const right = document.createElement("div");
-      right.innerHTML = `<span class="pill">${pt.functions.length} function(s)</span>`;
-
-      header.appendChild(left);
-      header.appendChild(right);
-      wrapper.appendChild(header);
-
-      const ul = document.createElement("ul");
-      ul.className = "function-list";
-
-      pt.functions.forEach((fn) => {
-        const li = document.createElement("li");
-        li.textContent = fn;
-        ul.appendChild(li);
+      uniquePoints.forEach(([point, pinyin]) => {
+        const opt = document.createElement("option");
+        opt.value = point;
+        opt.textContent = pinyin ? `${point} — ${pinyin}` : point;
+        pointSelect.appendChild(opt);
       });
 
-      wrapper.appendChild(ul);
-      pointResults.appendChild(wrapper);
-    }
+      const categories = Array.from(
+        new Set(rows.map((r) => r.category).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
 
-    pointShowBtn.addEventListener("click", showPointFunctions);
-    pointSelect.addEventListener("change", showPointFunctions);
+      categories.forEach((cat) => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.textContent = cat;
+        categorySelect.appendChild(opt);
+      });
 
-    // Initialise empty-result text
-    functionResults.innerHTML =
-      "<div class='result-empty'>Type a keyword to search for functions across all points.</div>";
-    pointResults.innerHTML =
-      "<div class='result-empty'>Choose a point to view its full function list.</div>";
+      function searchByFunction() {
+        const raw = functionInput.value.trim();
+        const q = raw.toLowerCase();
+        functionResults.innerHTML = "";
+
+        if (!q) {
+          functionResults.innerHTML =
+            "<div class='result-empty'>Type a function like <em>stiff neck</em>, <em>pain of the knee</em>, or <em>atrophy</em>.</div>";
+          return;
+        }
+
+        const subset = rows.filter((r) =>
+          (r.functionText || "").toLowerCase().includes(q)
+        );
+
+        if (!subset.length) {
+          functionResults.innerHTML =
+            "<div class='result-empty'>No matches for that function text. Try another keyword or shorter phrase.</div>";
+          return;
+        }
+
+        const groups = groupByPoint(subset);
+        renderPointGroups(groups, functionResults, { query: raw, showCount: true });
+      }
+
+      function clearFunctionSearch() {
+        functionInput.value = "";
+        functionResults.innerHTML =
+          "<div class='result-empty'>Cleared. Enter a function keyword to search again.</div>";
+        functionInput.focus();
+      }
+
+      functionSearchBtn.addEventListener("click", searchByFunction);
+      functionClearBtn.addEventListener("click", clearFunctionSearch);
+      functionInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          searchByFunction();
+        }
+      });
+
+      function showPointFunctions() {
+        const code = pointSelect.value;
+        pointResults.innerHTML = "";
+
+        if (!code) {
+          pointResults.innerHTML =
+            "<div class='result-empty'>Choose a point above to see all its functions.</div>";
+          return;
+        }
+
+        const subset = rows.filter((r) => r.point === code);
+        if (!subset.length) {
+          pointResults.innerHTML =
+            "<div class='result-empty'>No rows found for that point in the dataset.</div>";
+          return;
+        }
+
+        const groups = groupByPoint(subset);
+        renderPointGroups(groups, pointResults, { showCount: false });
+      }
+
+      pointShowBtn.addEventListener("click", showPointFunctions);
+      pointSelect.addEventListener("change", showPointFunctions);
+
+      function searchByCategory() {
+        const cat = categorySelect.value;
+        categoryResults.innerHTML = "";
+
+        if (!cat) {
+          categoryResults.innerHTML =
+            "<div class='result-empty'>Choose a category first.</div>";
+          return;
+        }
+
+        const subset = rows.filter((r) => r.category === cat);
+        if (!subset.length) {
+          categoryResults.innerHTML =
+            "<div class='result-empty'>No rows tagged with that category in the dataset.</div>";
+          return;
+        }
+
+        const groups = groupByPoint(subset);
+        renderPointGroups(groups, categoryResults, {
+          selectedCategory: cat,
+          showCount: true
+        });
+      }
+
+      function clearCategorySearch() {
+        categorySelect.value = "";
+        categoryResults.innerHTML =
+          "<div class='result-empty'>Cleared. Choose a category to search again.</div>";
+      }
+
+      categorySearchBtn.addEventListener("click", searchByCategory);
+      categoryClearBtn.addEventListener("click", clearCategorySearch);
+
+      functionResults.innerHTML =
+        "<div class='result-empty'>Type a keyword to search for functions across all points.</div>";
+      pointResults.innerHTML =
+        "<div class='result-empty'>Choose a point to view all its functions.</div>";
+      categoryResults.innerHTML =
+        "<div class='result-empty'>Choose a category to see related points/functions.</div>";
+    });
   </script>
 </body>
 </html>
